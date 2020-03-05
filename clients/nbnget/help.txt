@@ -1,0 +1,18 @@
+.nbnget [OPTIONS] FILE
+
+NextBestNetwork CDN File Fetcher
+
+options:
+ -h      Show this help screen
+ -s xxxx Alternative Server *
+ -p xxxx Alternative Port
+ -v      Verbose AT protocol log
+
+* WARNING
+ The -s option allows you to
+change the remote file-source.
+ Ensure you trust any software
+you download, failure to do so
+could result in instability or
+even a broken Next...
+             Use With Caution!
