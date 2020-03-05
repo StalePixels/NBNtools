@@ -1,0 +1,16 @@
+{
+  // Number of waiting inbound connections to queue when busy
+  "BACKLOG": 128,
+
+  // Where the docroot live
+  "FILEPATH": "public",
+
+  // Interface to bind to, default means all
+  "IP": "0.0.0.0",
+
+  // TCP port to listen on
+  "PORT": 48128,
+
+  // How often to try restarting if server has critical failure
+  "RETRY": 1000
+}

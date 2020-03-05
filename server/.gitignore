@@ -1,0 +1,10 @@
+node_modules
+test
+.idea
+coverage
+.nyc_output
+*.log
+config.json
+yarn.lock
+public/*
+src/cdn
