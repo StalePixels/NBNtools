@@ -6,8 +6,8 @@
 
 #include "util.h"
 
-void looper() {
-    for(uint32_t i = 512; i>0;i--) {
+void looper(uint32_t delay) {
+    for(uint32_t i = delay; i>0;i--) {
         zx_border((uint8_t)i%7);
     }
 }

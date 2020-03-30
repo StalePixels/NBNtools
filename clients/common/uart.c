@@ -62,9 +62,9 @@ int Net_Command(char command[], uint8_t len) {
 
 void Net_Close() {
     Net_Send("+++", 3);
-    looper();
+    looper(512);
 
     Net_Command("MODE=0", 6);
     Net_Command("CLOSE", 5);
-    looper();
+    looper(512);
 }
