@@ -12,7 +12,7 @@ PUBLIC _err_bad_server
 
 ;       "+++Longest valid erro", 'r' + 0x80
 _err_timeout_byte:
-   defm "Time out awaiting byt", 'e' + 0x80
+   defm "Timeout awaiting byt", 'e' + 0x80
 _err_wrong_version:
    defm "Wrong protocol verso", 'n' + 0x80
 _err_at_protocol:

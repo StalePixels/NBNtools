@@ -1,3 +1,5 @@
 nbnget.c
-messages.asm
 help.asm
+../common/messages.asm
+../common/util.c
+../common/uart.c

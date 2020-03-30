@@ -16,8 +16,10 @@
 #include <string.h>
 
 #include "nbnget.h"
-#include "messages.h"
+#include "../common/messages.h"
 #include "help.h"
+#include "../common/util.h"
+#include "../common/uart.h"
 
 unsigned int prescalar;
 
@@ -48,26 +50,6 @@ static unsigned char defaultPort[] = "48128";
 static uint8_t customServer = 0;
 static uint8_t customPort = 0;
 static uint8_t fileArg = 1;
-
-
-void looper() {
-    for(uint32_t i = 512; i>0;i--) {
-        zx_border((uint8_t)i%7);
-//        zx_border(7);
-    }
-}
-
-unsigned char Net_GetUChar() {
-    zx_border(3);
-    unsigned long checking;
-    for(checking=0;checking<131071UL;checking++) {
-        if (IO_UART_STATUS & IUS_RX_AVAIL) {  // Busy wait to send a single byte.
-            zx_border(0);
-            return IO_UART_RX;
-        }
-    }
-    exit((int)err_timeout_byte);
-}
 
 void Net_Send(char command[], uint8_t len) {
     uint8_t command_letter = 0;
@@ -168,12 +150,6 @@ static void showhelp() {
 
 int main(int argc, char** argv) {
     zx_cls(PAPER_WHITE);
-//
-//    if (argc == 1) {
-//        // Error
-//        showhelp();
-//        exit((int)err_missing_filename);
-//    }
 
     counter = 0;
     // Let's check some options out
@@ -256,13 +232,9 @@ int main(int argc, char** argv) {
     IO_UART_BAUD_RATE = ((prescalar >> 7) & 0x7f) | 0x80;   // upper 7 bits
 
     printf("Closing Existing connections...\n");
-
     Net_Close();
-
     printf("Opening: NextBestNetwork");
-
     Net_Send("AT+CIPSTART=\"TCP\",\"", 19);
-
 
     if(customServer) {
         Net_Send(argv[customServer], strlen(argv[customServer]));

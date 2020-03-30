@@ -1,8 +1,8 @@
 // tslint:disable:no-console
 import * as fs from 'fs'
-import * as env from 'process'
 import * as net from 'net'
 import * as path from 'path'
+import { env } from 'process'
 import { log } from './lib/Logger';
 import { Session } from './lib/Session'
 

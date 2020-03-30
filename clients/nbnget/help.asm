@@ -9,7 +9,7 @@ _help:
    defb 0
 
 _version:
-   BINARY "../VERSION"
+   BINARY "../../VERSION"
    defb 0
 
 _credits:
