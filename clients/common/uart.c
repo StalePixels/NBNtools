@@ -9,7 +9,7 @@
 #include "util.h"
 #include "messages.h"
 
-unsigned char Net_GetUChar() {
+unsigned char UART_GetUChar() {
     zx_border(3);
     unsigned long checking;
     for(checking=0;checking<131071UL;checking++) {
@@ -21,7 +21,7 @@ unsigned char Net_GetUChar() {
     exit((int)err_timeout_byte);
 }
 
-void Net_Send(char command[], uint8_t len) {
+void UART_Send(char command[], uint8_t len) {
     uint8_t command_letter = 0;
 
     for(;len!=0;len--) {
@@ -32,15 +32,35 @@ void Net_Send(char command[], uint8_t len) {
     }
 }
 
-uint8_t Net_WaitOK(bool localecho) {
+uint8_t UART_WaitOK(bool localecho) {
     unsigned char cbuff[4];
     repeat:
     cbuff[0] = cbuff[1];
     cbuff[1] = cbuff[2];
     cbuff[2] = cbuff[3];
-    cbuff[3] = Net_GetUChar();
+    cbuff[3] = UART_GetUChar();
 
     if(localecho==true) printf("%c", cbuff[3]);
+//    if(localecho==true) printf("%c(%d)", cbuff[3], cbuff[3]);
+
+    if (cbuff[3] == 10 && cbuff[2] == 13 && cbuff[1] == 'K' && cbuff[0] == 'O') {
+        return 0;
+    } else if (cbuff[3] == 10 && cbuff[2] == 13 && cbuff[1] == 'R' && cbuff[0] == 'O') {
+        return 254;
+    }
+    goto repeat;
+}
+
+uint8_t UART_GetStatus(bool localecho) {
+    unsigned char cbuff[4];
+    repeat:
+    cbuff[0] = cbuff[1];
+    cbuff[1] = cbuff[2];
+    cbuff[2] = cbuff[3];
+    cbuff[3] = UART_GetUChar();
+
+    if(localecho==true) printf("%c", cbuff[3]);
+//    if(localecho==true) printf("%c(%d)", cbuff[3], cbuff[3]);
 
     if (cbuff[3] == 10 && cbuff[2] == 13 && cbuff[1] == 'K' && cbuff[0] == 'O') {
         return 0;
@@ -53,15 +73,15 @@ uint8_t Net_WaitOK(bool localecho) {
 int Net_Command(char command[], uint8_t len) {
     uint8_t command_letter = 0;
 
-    Net_Send("AT+CIP", 6);
-    Net_Send(command, len);
-    Net_Send("\x0D\x0A", 2);
+    UART_Send("AT+CIP", 6);
+    UART_Send(command, len);
+    UART_Send("\x0D\x0A", 2);
 
-    return Net_WaitOK(false);
+    return UART_WaitOK(false);
 }
 
-void Net_Close() {
-    Net_Send("+++", 3);
+void UART_Close() {
+    UART_Send("+++", 3);
     looper(512);
 
     Net_Command("MODE=0", 6);

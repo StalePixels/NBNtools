@@ -13,11 +13,12 @@ __sfr __banked __at 0x153b IO_UART_CONTROL;
 
 extern uint8_t verbose;
 
-unsigned char Net_GetUChar();
-void Net_Send(char command[], uint8_t len);
-uint8_t Net_WaitOK(bool localecho);
+unsigned char UART_GetUChar();
+void UART_Send(char command[], uint8_t len);
+uint8_t UART_WaitOK(bool localecho);
+uint8_t UART_GetStatus(bool localecho);
 int Net_Command(char command[], uint8_t len);
-void Net_Close();
+void UART_Close();
 
 
 #endif //NBNTOOLS_UART_H
