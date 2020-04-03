@@ -34,7 +34,7 @@ void UART_Send(char command[], uint8_t len) {
 
 uint8_t UART_WaitOK(bool localecho) {
     unsigned char cbuff[4];
-    repeat:
+repeat:
     cbuff[0] = cbuff[1];
     cbuff[1] = cbuff[2];
     cbuff[2] = cbuff[3];

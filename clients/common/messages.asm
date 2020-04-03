@@ -4,6 +4,7 @@ PUBLIC _err_timeout_byte
 PUBLIC _err_wrong_version
 PUBLIC _err_failed_connection
 PUBLIC _err_at_protocol
+PUBLIC _err_nbn_protocol
 PUBLIC _err_missing_filename
 PUBLIC _err_transfer_error
 PUBLIC _err_file_not_found
@@ -17,6 +18,8 @@ _err_wrong_version:
    defm "Wrong protocol verso", 'n' + 0x80
 _err_at_protocol:
    defm "ESP AT protocol erro", 'r' + 0x80
+_err_nbn_protocol:
+   defm "NBN protocol erro", 'r' + 0x80
 _err_bad_port:
    defm "Invalid port number", 'r' + 0x80
 _err_missing_filename:

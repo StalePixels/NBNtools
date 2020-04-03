@@ -9,7 +9,8 @@
 
 #include <stdlib.h>
 
-void NBN_GetBlock(char[] block);
-void NBN_SendBlock(char[] block);
+unsigned char NBN_GetStatus();
+void NBN_GetBlock(unsigned char[] block);
+void NBN_SendBlock(unsigned char[] block, uint8_t length);
 
 #endif //NBNTOOLS_NBN_H

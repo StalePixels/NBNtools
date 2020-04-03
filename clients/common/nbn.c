@@ -9,7 +9,24 @@
 #include "uart.h"
 #include "messages.h"
 
-void NBN_GetBlock(char[] block) {
+unsigned char NBN_GetStatus() {
+    unsigned char status[4];
+    status[0] = UART_GetUChar();
+    status[1] = UART_GetUChar();
+    status[2] = UART_GetUChar();
+    status[3] = 0;
+
+
+    if((status[0] == '!' || status[0] == '?') && status[1] == '\x0D' && status[2] == '\x0A') {
+        return(status[0]);
+    } else {
+        printf("%s", status);
+        UART_WaitOK(true);
+        exit((int)err_nbn_protocol);
+    }
+}
+
+void NBN_GetBlock(unsigned char[] block) {
     uint16_t valid = 0;
     uint8_t retries = 0;
     uint16_t checksum;
@@ -46,36 +63,44 @@ void NBN_GetBlock(char[] block) {
     }
 }
 
-void NBN_SendBlock(char[] block) {
+void NBN_SendBlock(unsigned char[] block, uint8_t length) {
     uint16_t checksum = 0;
     uint8_t retries = 0;
     uint8_t byte = 0;
 
 upload_block:
-    for(byte = 0; byte<NBN_blocksize;byte++) {
+    for(byte = 0; byte<length;byte++) {
+
         UART_Send(&block[byte],1);
         checksum = checksum + block[byte];
     }
 
-    UART_Send(&(checksum & 255),1);
-    UART_Send(&((checksum >> 8) & 255),1);
+    uint8_t checkpart;
 
-    byte = UART_GetUChar(true);
+//    printf("\x16\x01\x07");
+    checkpart = (checksum >> 8) & 255;      UART_Send(&checkpart,1);
+//    printf("Checksum: %u (%d)", checksum, checkpart);
+    checkpart = (checksum     ) & 255;      UART_Send(&checkpart,1);
+//    printf("(%d)     \n", checkpart);
+//    printf("\x16\x01\x08");
 
-    printf(byte);
+    uint8_t status = NBN_GetStatus();
 
-    if(byte=='!') {
+    if(status=='?') {
+        for(byte = 0; byte<length;byte++) {
+            printf("(%d)", block[byte]);
+        }
+        printf("Retrying\n ");
         retries++;
+        checksum = 0;
 
         if(retries>3) {
             exit((int) err_transfer_error);
         }
 
         zx_border(2);
-        checksum = 0;
         goto upload_block;
-    } else {
+    } else if(status=='!'){
         zx_border(1);
-//        esxdos_f_write(file_in, block, NBN_blocksize);
     }
 }
