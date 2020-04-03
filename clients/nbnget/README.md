@@ -1,6 +1,6 @@
-#NextBestNetwork CDN File Fetcher
+# NextBestNetwork CDN File Fetcher
 
-##options
+## options
  -h      Show this help screen
 
  -s xxxx Alternative Server 
@@ -9,9 +9,9 @@
  
  -v      Verbose AT protocol log
 
-##requirements
+## requirements
 Requires z88dk v2.
 Has been tested with ESP AT firmware versions 1.4, 1.5 and 1.6. Feedback for other versions welcome.
 
-##build
+## build
 Uses `make`.
