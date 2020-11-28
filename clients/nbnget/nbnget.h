@@ -3,12 +3,7 @@
 
 #include <stdlib.h>
 
-void looper();
-unsigned char Net_GetUChar();
-void Net_Send(char command[], uint8_t len);
-uint8_t Net_WaitOK(bool localecho);
-int Net_Command(char command[], uint8_t len);
-void Net_Close();
+unsigned char NET_GetUChar();
 static void shutdown();
 
 void NBN_GetBlock(uint8_t blockSize);

@@ -9,6 +9,7 @@ PUBLIC_DIR ?= $(RELEASE_DIR)/PUBLIC/$(NAME)
 PLUGIN_DIR ?= ./plugins
 DEV_DIR ?= $(RELEASE_DIR)/DEV
 GITHUB_DIR ?= $(RELEASE_DIR)/GITHUB
+INSTALL_DRIVE ?= /Volumes/devnext
 
 LIBSPRITE := ./zxnext_sprite
 LIBSPRITE_INCLUDE := $(LIBSPRITE)/include
@@ -53,13 +54,15 @@ clean:
 dirs:
 	$(MKDIR) $(BUILD_DIR)
 
-dotn: dirs
+dotn:
 	$(CC) $(CCFLAGS) $(LDFLAGS) @nbnget.lst -o$(NAME) -create-app -subtype=dotn
 	$(MV) $(NAME) $(BUILD_DIR)/$(NAME)
 
-binaries: dotn
+binaries: dirs dotn
 
 install:
-	$(CP) $(BUILD_DIR)/$(NAME) /Volumes/airflash/dot
+	$(CP) $(BUILD_DIR)/$(NAME) $(INSTALL_DRIVE)/dot
+
+q: dotn install
 
 deploy: all install

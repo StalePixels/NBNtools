@@ -20,6 +20,7 @@
 #include "../common/messages.h"
 #include "../common/util.h"
 #include "../common/uart.h"
+#include "../common/net.h"
 
 unsigned int prescalar;
 
@@ -50,45 +51,10 @@ static unsigned char defaultPort[] = "48128";
 static uint8_t customServer = 0;
 static uint8_t customPort = 0;
 static uint8_t fileArg = 1;
-
-void NBN_GetBlock(uint8_t blockSize) {
-    uint16_t valid = 0;
-    uint8_t retries = 0;
-
-download_block:
-    for(uint8_t byte = 0; byte<blockSize;byte++) {
-        block[byte] = Net_GetUChar();
-        valid = valid + block[byte];
-    }
-
-    uint8_t byte = Net_GetUChar();
-    checksum = byte;
-    checksum = checksum<<8;
-
-    byte = Net_GetUChar();
-    checksum = checksum + byte;
-
-    if(checksum!=valid) {
-        retries++;
-
-        if(retries>3) {
-            exit((int) err_transfer_error);
-        }
-        // Get data
-        Net_Send("?", 1);
-        Net_Send("\x0D\x0A", 2);
-
-        zx_border(2);
-        valid = 0;
-        goto download_block;
-    } else {
-        zx_border(1);
-        esxdos_f_write(file_out, block, blockSize);
-    }
-}
+static bool resetWifi = false;
 
 static void shutdown() {
-    Net_Close();
+    NET_Close();
     esxdos_f_close(file_out);
 
     zx_border(7);
@@ -150,6 +116,18 @@ int main(int argc, char** argv) {
             customPort = counter;
         } else
 
+        if (stricmp(argv[counter], "-r") == 0) {
+
+            // make sure I'm not the last param...
+            if(counter+2>argc) {
+                // Error
+                showhelp();
+                exit((int)err_missing_filename);
+            }
+
+            resetWifi = true;
+        } else
+
         if (argv[counter][0]=='-') {
             // Error
             showhelp();
@@ -183,37 +161,39 @@ int main(int argc, char** argv) {
     IO_UART_BAUD_RATE = prescalar & 0x7f;                   // lower 7 bits
     IO_UART_BAUD_RATE = ((prescalar >> 7) & 0x7f) | 0x80;   // upper 7 bits
 
-    printf("Closing Existing connections...\n");
-    Net_Close();
+    if(resetWifi) {
+        printf("Closing Existing connections...\n");
+        NET_Close();
+    }
     printf("Opening: NextBestNetwork");
-    Net_Send("AT+CIPSTART=\"TCP\",\"", 19);
+    NET_Send("AT+CIPSTART=\"TCP\",\"", 19);
 
     if(customServer) {
-        Net_Send(argv[customServer], strlen(argv[customServer]));
+        NET_Send(argv[customServer], strlen(argv[customServer]));
     } else {
-        Net_Send(defaultServer, strlen(defaultServer));
+        NET_Send(defaultServer, strlen(defaultServer));
     }
 
-    Net_Send("\",", 2);
+    NET_Send("\",", 2);
     if(customPort) {
-        Net_Send(argv[customPort], strlen(argv[customPort]));
+        NET_Send(argv[customPort], strlen(argv[customPort]));
     } else {
-        Net_Send(defaultPort, strlen(defaultPort));
+        NET_Send(defaultPort, strlen(defaultPort));
     }
-    Net_Send("\x0D\x0A", 2);
-    errno = Net_WaitOK(false);
+    NET_Send("\x0D\x0A", 2);
+    errno = NET_GetOK(true);
 
     if(errno) {
         exit((int)err_failed_connection);
     }
     printf(" - DONE\n");
 
-    errno = Net_Command("MODE=1", 6);
+    errno = NET_Command("MODE=1", 6);
     if(errno) {
         exit((int)err_at_protocol);
     };
 
-    Net_Command("SEND", 4);
+    NET_Command("SEND", 4);
     if(errno) {
         exit((int)err_at_protocol);
     };
@@ -221,7 +201,7 @@ int main(int argc, char** argv) {
     errno = 255;
     while (1) {
         errno--;
-        unsigned char okflag = Net_GetUChar();
+        unsigned char okflag = NET_GetUChar();
 
         if (okflag == '>') {
             goto get_file;
@@ -233,47 +213,51 @@ int main(int argc, char** argv) {
     }
 
 get_file:
-    Net_Send("GET ",4);
-    Net_Send(argv[fileArg], strlen(argv[fileArg]));
-    Net_Send("\x0A", 1);
+    NET_Send("GET ",4);
+    NET_Send(argv[fileArg], strlen(argv[fileArg]));
+    NET_Send("\x0A", 1);
 
-    errno = Net_GetUChar();
-    if(errno!=1) {              // VALIDATE PROTOCOL VERSION
+    errno = NET_GetUChar();
+    if(errno!=2) {              // VALIDATE PROTOCOL VERSION
         if(errno&64) {          // And, check that the character was ASCII, Protocols only ever go up to V63,
                                 //  so if we get back a bit7(64+) char, we know it's not a protocol header...
                                 //
                                 // Now generate an error, the first character of which is already in errno...
             printf("\n Server Said: %c", errno);
-            Net_WaitOK(true);
+            NET_GetOK(true);
             exit((int)err_file_not_found);
         }
 
         exit((int)err_wrong_version);
     }
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     size = (counter<<24);
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     size = size + (counter<<16);
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     size = size + (counter<<8);
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     size = size + counter;
 
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     blocks = (counter<<24);
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     blocks = blocks + (counter<<16);
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     blocks = blocks + (counter<<8);
-    counter = Net_GetUChar();
+    counter = NET_GetUChar();
     blocks = blocks + counter;
 
-    remainder = Net_GetUChar();
+    counter = NET_GetUChar();
+    remainder = (counter<<8);
+    counter = NET_GetUChar();
+    remainder = remainder + counter;
+
 
     // reset index for string
     counter = 0;
 append_filename:
-    filename[counter] = Net_GetUChar();
+    filename[counter] = NET_GetUChar();
     if(filename[counter]==0) goto begin_transfer;
     counter++;
     goto append_filename;
@@ -287,37 +271,38 @@ begin_transfer:
 
     errno = 0;
     // Open Write Output
-    file_out = esxdos_f_open(filename, ESXDOS_MODE_W | ESXDOS_MODE_CT);
+//    file_out = esxdos_f_open(filename, ESXDOS_MODE_W | ESXDOS_MODE_CT);
 
     // Check
-    if (errno)
-    {
-        printf("Could not create:\n %s\n", filename);
+//    if (errno)
+//    {
+//        printf("Could not create:\n %s\n", filename);
+//
+//        exit(errno);
+//    }
+//
+//    // FOR BLOCKS
+//    for(;blocks>0;blocks--) {
+//        // Get data
+//        NET_Send("!", 1);
+//        NET_Send("\x0D\x0A", 2);
+//
+//        NBN_GetBlock(240);
+//
+//        printf("\x16\x01\x07");
+//        printf("Blocks: %lu left \n   ", blocks);
+//        printf("\x16\x01\x08");
+//    }
+//
+//    NET_Send("!", 1);
+//    NET_Send("\x0D\x0A", 2);
+//
+//    printf("\x16\x01\x07");
+//    printf("Blocks: %lu left \n   ", blocks);
+//    printf("\x16\x01\x08");
+//
+//    NBN_GetBlock(remainder);
 
-        exit(errno);
-    }
-
-    // FOR BLOCKS
-    for(;blocks>0;blocks--) {
-        // Get data
-        Net_Send("!", 1);
-        Net_Send("\x0D\x0A", 2);
-
-        NBN_GetBlock(240);
-
-        printf("\x16\x01\x07");
-        printf("Blocks: %lu left \n   ", blocks);
-        printf("\x16\x01\x08");
-    }
-
-    Net_Send("!", 1);
-    Net_Send("\x0D\x0A", 2);
-
-    printf("\x16\x01\x07");
-    printf("Blocks: %lu left \n   ", blocks);
-    printf("\x16\x01\x08");
-
-    NBN_GetBlock(remainder);
-
+    printf(" Gracefully finished...\n");
     exit(0);
 }

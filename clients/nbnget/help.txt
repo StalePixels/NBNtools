@@ -6,13 +6,9 @@ options:
  -h      Show this help screen
  -s xxxx Alternative Server *
  -p xxxx Alternative Port
+ -r      Reset WiFi connection
  -v      Verbose AT protocol log
 
 * WARNING
- The -s option allows you to
-change the remote file-source.
- Ensure you trust any software
-you download, failure to do so
-could result in instability or
-even a broken Next...
-             Use With Caution!
+ -s changes remote file-source,
+use caution on untrusted servers
