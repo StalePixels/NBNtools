@@ -2,12 +2,35 @@
 // Created by D Rimron-Soutter on 31/03/2020.
 //
 
-#include <arch/zx.h>
+#include <arch/zxn.h>
+#include <arch/zxn/esxdos.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 #include "nbn.h"
 #include "uart.h"
 #include "messages.h"
+#include "net.h"
+
+uint8_t nbnBottom8KPage = 0, nbnTop8KPage = 0;
+unsigned char *nbnBlock = 0x4000;
+
+bool NBN_Malloc() {
+    nbnBottom8KPage = esx_ide_bank_alloc(0);
+    nbnTop8KPage = esx_ide_bank_alloc(0);
+
+    printf ("GOT %d and %d\n", nbnBottom8KPage, nbnTop8KPage);
+
+    if (!nbnBottom8KPage || !nbnTop8KPage) return false;
+
+    return true;
+}
+
+void NBN_Free() {
+    esx_ide_bank_free(0, nbnBottom8KPage);
+    esx_ide_bank_free(0, nbnTop8KPage);
+}
 
 unsigned char NBN_GetStatus() {
     unsigned char status[4];
@@ -26,81 +49,44 @@ unsigned char NBN_GetStatus() {
     }
 }
 
-void NBN_GetBlock(unsigned char[] block) {
-    uint16_t valid = 0;
-    uint8_t retries = 0;
-    uint16_t checksum;
+bool NBN_GetBlock(uint16_t blockSize) {
+    uint8_t nbnComputed = 0;
 
-    download_block:
-    for(uint8_t byte = 0; byte<NBN_blocksize;byte++) {
-        block[byte] = UART_GetUChar();
-        valid = valid + block[byte];
+    ZXN_WRITE_MMU2(nbnBottom8KPage);
+    ZXN_WRITE_MMU3(nbnTop8KPage);
+    for(uint16_t nbnByte = 0; nbnByte < blockSize; nbnByte++) {
+        nbnBlock[nbnByte] = NET_GetUChar();
+        // #1. This is basically a glorious hack, keep adding bytes to an uint8, then...
+        nbnComputed = nbnComputed + nbnBlock[nbnByte];
+        zx_border(nbnBlock[nbnByte]%8);
+    }
+    ZXN_WRITE_MMU2(ULA_BOTTOM_PAGE);
+    ZXN_WRITE_MMU3(ULA_TOP_PAGE);
+
+    uint8_t nbnChecksum =  NET_GetUChar();
+
+    // #2. ...only care about the final result. "Free" mod256 maths
+    if(nbnChecksum == nbnComputed) {
+        return true;
     }
 
-    uint8_t byte = UART_GetUChar();
-    checksum = byte;
-    checksum = checksum<<8;
-
-    byte = UART_GetUChar();
-    checksum = checksum + byte;
-
-    if(checksum!=valid) {
-        retries++;
-
-        if(retries>3) {
-            exit((int) err_transfer_error);
-        }
-        // Get data
-        UART_Send("?", 1);
-        UART_Send("\x0D\x0A", 2);
-
-        zx_border(2);
-        valid = 0;
-        goto download_block;
-    } else {
-        zx_border(1);
-//        esxdos_f_write(file_in, block, NBN_blocksize);
-    }
+    return false;
 }
 
-void NBN_SendBlock(unsigned char[] block, uint8_t length) {
-    uint16_t checksum = 0;
-    uint8_t retries = 0;
-    uint8_t byte = 0;
+bool NBN_WriteBlock(uint8_t fileHandle, uint16_t blockSize) {
+    errno = 0;
 
-upload_block:
-    for(byte = 0; byte<length;byte++) {
+    ZXN_WRITE_MMU2(nbnBottom8KPage);
+    ZXN_WRITE_MMU3(nbnTop8KPage);
 
-        UART_Send(&block[byte],1);
-        checksum = checksum + block[byte];
+    esxdos_f_write(fileHandle, nbnBlock, blockSize);
+
+    ZXN_WRITE_MMU2(ULA_BOTTOM_PAGE);
+    ZXN_WRITE_MMU3(ULA_TOP_PAGE);
+
+    if(errno) {
+        return false;
     }
 
-    uint8_t checkpart;
-
-//    printf("\x16\x01\x07");
-    checkpart = (checksum >> 8) & 255;      UART_Send(&checkpart,1);
-//    printf("Checksum: %u (%d)", checksum, checkpart);
-    checkpart = (checksum     ) & 255;      UART_Send(&checkpart,1);
-//    printf("(%d)     \n", checkpart);
-//    printf("\x16\x01\x08");
-
-    uint8_t status = NBN_GetStatus();
-
-    if(status=='?') {
-        for(byte = 0; byte<length;byte++) {
-            printf("(%d)", block[byte]);
-        }
-        printf("Retrying\n ");
-        retries++;
-        checksum = 0;
-
-        if(retries>3) {
-            exit((int) err_transfer_error);
-        }
-
-        zx_border(2);
-        goto upload_block;
-    } else if(status=='!'){
-        zx_border(1);
-    }
+    return true;
 }

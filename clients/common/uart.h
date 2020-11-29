@@ -11,10 +11,11 @@
 __sfr __banked __at 0x153b IO_153B;
 __sfr __banked __at 0x153b IO_UART_CONTROL;
 
-extern uint8_t verbose;
-
 unsigned char UART_GetUChar();
+
+void UART_SetVerbose(bool status);
 void UART_Send(char command[], uint8_t len);
+void UART_PutCh(char c);
 uint8_t UART_WaitOK(bool localecho);
 uint8_t UART_GetStatus(bool localecho);
 int Net_Command(char command[], uint8_t len);

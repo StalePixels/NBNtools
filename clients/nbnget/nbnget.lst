@@ -1,6 +1,8 @@
 nbnget.c
 help.asm
+../common/spui_lite.c
 ../common/messages.asm
 ../common/util.c
 ../common/uart.c
 ../common/net.c
+../common/nbn.c
