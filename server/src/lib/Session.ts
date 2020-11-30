@@ -1,6 +1,7 @@
 import * as net from 'net'
 import { TextEncoder } from "util";
 import {log} from './Logger';
+// import { NBNServer } from './NBNServer/NBNServer';
 import { PersonalServer } from './PersonalServer';
 
 function concatTypedArrays(a: any, b: any): any { // a, b TypedArray of same type
@@ -21,7 +22,6 @@ export class Session {
     this.config = config;
     this.socket = socket;
 
-//    this.server = new NBNServer(this);
     /*
      *
      * Establish our file-server, this handles all the protocol management and is a reduced version of
@@ -46,11 +46,11 @@ export class Session {
     switch(this.state) {
       case "W":     // WAITING for command
         // Parse the commands
-        const cmds = buffer.toString()                        // As string
-            .replace(/^\s+|\s+$/g, '')// Remove CR if any
-            .split(" ");                            // Break at space
-        const cmd = cmds[0].toUpperCase();                   // Uppercase
-        const params = cmds.slice(1,);                       // Leftovers after start of string
+        const cmds = buffer.toString()                          // As string
+            .replace(/^\s+|\s+$/g, '')  // Remove CR if any
+            .split(" ");                              // Break at space
+        const cmd = cmds[0].toUpperCase();                      // Uppercase
+        const params = cmds.slice(1,);                          // Leftovers after start of string
         log(`Dispatching COMMAND: "${cmd}" PARAMS: `, params, " to NBNServer");
 
         this.server.command(cmd, params);

@@ -43,7 +43,7 @@ const config = {
 
 // 'connection' listener.
 const server  = net.createServer((socket) => {
-  log('nbnget connected');
+  log('Client connected');
 
   socket.on('end', () => {
     log('Socket closed');
@@ -70,8 +70,7 @@ server.listen(config.PORT, config.IP, config.BACKLOG)
 
   // Connection Listener
   .on('connection', socket => {
-    // @ts-ignore
-    const session = new Session(socket, config);
+    new Session(socket, config);
   })
 
     // Connection Cleanup

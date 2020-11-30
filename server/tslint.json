@@ -12,7 +12,7 @@
     "typedef": [true, "call-signature"],
 
     // Immutability rules
-    "readonly-keyword": true,
+    "readonly-keyword": false,
     "readonly-array": true,
     "no-object-mutation": true,
     "no-method-signature": true,

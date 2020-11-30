@@ -1,15 +1,16 @@
 {
   "name": "nbnget-server",
   "version": "1.0.0",
-  "description": "Next Best Network Client & Server",
+  "description": "Next Best Network PersonalServer",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
   "module": "build/module/index.js",
-  "repository": "https://github.com/StalePixels/nbnget",
+  "repository": "https://github.com/StalePixels/NBNtools",
   "license": "MIT",
   "keywords": [],
   "scripts": {
     "start": "node build/main/index.js",
+    "nodemon": "nodemon --ext \"ts\" -w src --exec \"npm run-script build && npm run-script start\"",
     "describe": "npm-scripts-info",
     "build": "run-s clean && run-p build:*",
     "build:main": "tsc -p tsconfig.json",
