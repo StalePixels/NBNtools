@@ -1,6 +1,7 @@
 #ifndef _MESSAGES_H
 #define _MESSAGES_H
 
+extern unsigned char err_invalid_option[];
 extern unsigned char err_timeout_byte[];
 extern unsigned char err_wrong_version[];
 extern unsigned char err_failed_connection[];
