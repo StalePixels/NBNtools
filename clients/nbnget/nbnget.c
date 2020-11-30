@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
 
     printf("Opening: NextBestNetwork\n");
 
-    NET_Connect((customServer ? argv[customServer] : defaultServer), (customPort ? customPort : defaultPort));
+    NET_Connect((customServer ? argv[customServer] : defaultServer), (customPort ? argv[customPort] : defaultPort));
 
     errno = NET_GetOK(true);    // We always want localecho here, because it shows up hung wifi modules that way...
 
