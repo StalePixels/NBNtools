@@ -70,7 +70,7 @@ static void shutdown() {
     ZXN_NEXTREGA(REG_TURBO_MODE, old_cpu_speed);
 }
 
-static void help_and_exit(int exit_value) {
+static void help_and_exit(int exit_value) __z88dk_fastcall {
     printf("%s",help);
     printf("\nv%s by %s",version, credits);
 
@@ -169,42 +169,22 @@ int main(int argc, char** argv) {
         NET_Close();
     }
 
-    printf("Opening: NextBestNetwork");
+    printf("Opening: NextBestNetwork\n");
 
-    // THis needs turning into a proper helper...
-    NET_Send("AT+CIPSTART=\"TCP\",\"", 19);
+    NET_Connect((customServer ? argv[customServer] : defaultServer), (customPort ? customPort : defaultPort));
 
-    if(customServer) {
-        NET_Send(argv[customServer], strlen(argv[customServer]));
-    } else {
-        NET_Send(defaultServer, strlen(defaultServer));
-    }
-
-    NET_Send("\",", 2);
-    if(customPort) {
-        NET_Send(argv[customPort], strlen(argv[customPort]));
-    } else {
-        NET_Send(defaultPort, strlen(defaultPort));
-    }
-    NET_Send("\x0D\x0A", 2);
-    errno = NET_GetOK(true);
+    errno = NET_GetOK(true);    // We always want localecho here, because it shows up hung wifi modules that way...
 
     if(errno) {
         exit((int)err_failed_connection);
     }
-    printf(" - DONE\n");
+    printf("\nConnected!\n");
 
-    errno = NET_Command("MODE=1", 6);
-    if(errno) {
-        exit((int)err_at_protocol);
-    };
+    NET_ModeSingle();
 
-    NET_Command("SEND", 4);
-    if(errno) {
-        exit((int)err_at_protocol);
-    };
+    NET_OpenSocket();
 
-    errno = 255;
+    errno = 255;                                        // Wait for the server to send the ">" prompt
     while (1) {
         errno--;
         unsigned char okflag = NET_GetUChar();
@@ -271,7 +251,7 @@ append_filename:
     counter++;
     goto append_filename;
 
-    begin_transfer:
+begin_transfer:
 
     if(!NBN_Malloc()) {
         // DIE DUE TO NO MEMORY
@@ -351,7 +331,7 @@ append_filename:
         NET_PutCh(NBN_BLOCK_SUCCESS);
         NET_Send("1\x0D\x0A", 3);
 
-        receive_next_block:
+    receive_next_block:
         printf("%c", progressChar);
         if(!NBN_GetBlock(NBN_MAX_BLOCKSIZE)) {
             printf("\x1C");  // move cursor back one
@@ -400,7 +380,7 @@ append_filename:
     printFlashOn();
     retries = 3;
 
-    receive_last_block:
+receive_last_block:
     printf("%c", progressChar);
     if(!NBN_GetBlock(remainder)) {
         printf("\x1C");  // move cursor back one
