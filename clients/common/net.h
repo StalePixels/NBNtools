@@ -18,5 +18,10 @@ int NET_Command(char command[], uint8_t len);
 //int NET_Send(char command[], uint8_t len);
 void NET_Close();
 uint8_t NET_GetOK(bool localecho);
+void NET_Connect(char* server, char* port);
+void NET_ModeSingle();
+void NET_ModeMulti();
+void NET_OpenSocket();
+
 
 #endif //NBNTOOLS_NET_H

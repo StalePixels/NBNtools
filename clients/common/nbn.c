@@ -20,8 +20,6 @@ bool NBN_Malloc() {
     nbnBottom8KPage = esx_ide_bank_alloc(0);
     nbnTop8KPage = esx_ide_bank_alloc(0);
 
-    printf ("GOT %d and %d\n", nbnBottom8KPage, nbnTop8KPage);
-
     if (!nbnBottom8KPage || !nbnTop8KPage) return false;
 
     return true;
