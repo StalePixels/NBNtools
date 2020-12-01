@@ -6,8 +6,8 @@
 
 #include "util.h"
 
-void looper(uint32_t delay) {
+void looper(uint32_t delay) __z88dk_fastcall {
     for(uint32_t i = delay; i>0;i--) {
-        zx_border((uint8_t)i%7);
+        zx_border(i%2);
     }
 }

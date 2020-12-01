@@ -8,7 +8,7 @@
 #include "messages.h"
 #include <string.h>
 
-int NET_Command(char command[], uint8_t len) {
+int NET_Command(char command[], uint8_t len) __z88dk_fastcall {
     uint8_t command_letter = 0;
 
     UART_Send("AT+CIP", 6);
@@ -18,20 +18,16 @@ int NET_Command(char command[], uint8_t len) {
     return UART_WaitOK(false);
 }
 
-//int NET_Send(char command[], uint8_t len) {
-//    UART_Send(command, len);
-//}
-
-void NET_Close() {
+void NET_Close(void) {
     UART_Send("+++", 3);
-    looper(512);
+    looper(1024);
 
     NET_Command("MODE=0", 6);
     NET_Command("CLOSE", 5);
     looper(512);
 }
 
-uint8_t NET_GetOK(bool localecho) {
+uint8_t NET_GetOK(bool localecho) __z88dk_fastcall {
     uint8_t command_letter = 0;
 
     UART_Send("AT\x0D\x0A", 4);

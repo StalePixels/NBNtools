@@ -1,4 +1,4 @@
-#pragma printf = "%ld %lu %d %s %c %u"
+#pragma printf = "%ld %lu %d %s %c %u %x"
 #pragma output CLIB_EXIT_STACK_SIZE = 1
 
 #include <z80.h>
@@ -164,7 +164,10 @@ int main(int argc, char** argv) {
     IO_UART_BAUD_RATE = prescalar & 0x7f;                   // lower 7 bits
     IO_UART_BAUD_RATE = ((prescalar >> 7) & 0x7f) | 0x80;   // upper 7 bits
 
-    if(resetWifi) {
+    errno = 0;
+    errno = NET_GetOK(true); // We always want localecho here, because it shows up hung wifi modules that way...
+
+    if(errno || resetWifi) {
         printf("Closing Existing connections...\n");
         NET_Close();
     }
@@ -173,7 +176,7 @@ int main(int argc, char** argv) {
 
     NET_Connect((customServer ? argv[customServer] : defaultServer), (customPort ? argv[customPort] : defaultPort));
 
-    errno = NET_GetOK(true);    // We always want localecho here, because it shows up hung wifi modules that way...
+    errno = UART_WaitOK(false);
 
     if(errno) {
         exit((int)err_failed_connection);
@@ -217,31 +220,9 @@ get_file:
         exit((int)err_wrong_version);
     }
 
-    // Get the file size
-    counter = NET_GetUChar();
-    size = (counter<<24);
-    counter = NET_GetUChar();
-    size = size + (counter<<16);
-    counter = NET_GetUChar();
-    size = size + (counter<<8);
-    counter = NET_GetUChar();
-    size = size + counter;
-
-    // Get the file blockcount
-    counter = NET_GetUChar();
-    blocks = (counter<<24);
-    counter = NET_GetUChar();
-    blocks = blocks + (counter<<16);
-    counter = NET_GetUChar();
-    blocks = blocks + (counter<<8);
-    counter = NET_GetUChar();
-    blocks = blocks + counter;
-
-    // get the (irregular) size of the final block
-    counter = NET_GetUChar();
-    remainder = (counter << 8);
-    counter = NET_GetUChar();
-    remainder = remainder + counter;
+    NET_GetUInt32(&size);
+    NET_GetUInt32(&blocks);
+    NET_GetUInt16(&remainder);
 
     // reset index for string len mgmt
     counter = 0;

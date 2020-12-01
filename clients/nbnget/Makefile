@@ -21,8 +21,10 @@ LIBLAYER2_LIB := $(LIBLAYER2)/lib/sccz80
 
 DEBUGFLAGS := --list --c-code-in-asm
 
+CRT := 1
+
 CC=zcc
-CCFLAGS=+zxn -vn -O3 -startup=1 -clib=new
+CCFLAGS=+zxn -vn -O3 -startup=$(CRT) -clib=new
 LDFLAGS=-m -lm
 INCFLAGS=
 

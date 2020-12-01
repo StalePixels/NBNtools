@@ -9,6 +9,7 @@ export declare class PersonalServer {
     private fileHandle;
     private currentWorkingDirectory;
     private preferredBlockSize;
+    private preferredDirSize;
     private remainder;
     private retries;
     private session;

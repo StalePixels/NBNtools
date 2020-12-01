@@ -18,7 +18,7 @@ void UART_SetVerbose(bool status) {
 unsigned char UART_GetUChar() {
     zx_border(3);
     unsigned long checking;
-    for(checking=0;checking<131071UL;checking++) {
+    for(checking=0;checking<DEFAULT_TIMEOUT;checking++) {
         if (IO_UART_STATUS & IUS_RX_AVAIL) {  // Busy wait to send a single byte.
             zx_border(0);
             return IO_UART_RX;
@@ -27,7 +27,23 @@ unsigned char UART_GetUChar() {
     exit((int)err_timeout_byte);
 }
 
-void UART_Send(char command[], uint8_t len) {
+void UART_GetUInt16(uint8_t* val) {
+    *val = UART_GetUChar();
+    ++val;
+    *val = UART_GetUChar();
+}
+
+void UART_GetUInt32(uint8_t* val) {
+    *val = UART_GetUChar();
+    ++val;
+    *val = UART_GetUChar();
+    ++val;
+    *val = UART_GetUChar();
+    ++val;
+    *val = UART_GetUChar();
+}
+
+void UART_Send(char *command, uint8_t len) {
     uint8_t command_letter = 0;
 
     for(;len!=0;len--) {

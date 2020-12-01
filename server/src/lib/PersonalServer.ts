@@ -7,6 +7,8 @@ import { Session } from './Session';
 const MAX_FILE_SIZE = 4294967295;
 const DEFAULT_BLOCK_SIZE = 4096;
 const DEFAULT_CHECKSUM = 256;
+const DEFAULT_DIR_SIZE = 16;
+const PROTOCOL_VERSION = 2;
 
 const NBN_COMMAND_NEXT = "!".charCodeAt(0);
 const NBN_COMMAND_BACK = "<".charCodeAt(0);
@@ -20,6 +22,7 @@ export class PersonalServer {
     private fileHandle: number;
     private currentWorkingDirectory: string;
     private preferredBlockSize: number;
+    private preferredDirSize: number;
     private remainder: number;
     private retries: number;
     private session: Session;
@@ -30,6 +33,7 @@ export class PersonalServer {
         this.session = session;
         this.state = "W"; // WAITING
         this.preferredBlockSize = DEFAULT_BLOCK_SIZE;
+        this.preferredDirSize = DEFAULT_DIR_SIZE;
         this.checksumBase = DEFAULT_CHECKSUM;
         this.currentWorkingDirectory = ''
 
@@ -44,7 +48,7 @@ export class PersonalServer {
             case "LS":
             case "CAT":
             case "DIR":
-                this.sendDir(params.join(' '));
+                this.sendDir(parseInt(params[0]));
                 break;
             case "QUIT":
                 this.session.end("OK");
@@ -72,7 +76,7 @@ export class PersonalServer {
                 break;
             case "C":    // FILE COMPLETE
                 if(buffer[0] === NBN_COMMAND_NEXT) {
-                    this.state = 'W';
+                    this.session.state = 'W';
                 } else if(buffer[0] === NBN_COMMAND_BACK) {
                     this.retries++;
                     this.sendBlock();
@@ -83,68 +87,40 @@ export class PersonalServer {
         }
     }
 
-    private sendDir(localPath: string): void {
-        const absFile = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory + localPath);
+    private sendDir(dirPage = 1): void {
+        const absPath = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory);
 
-        if(!absFile.startsWith(this.session.config.FILEPATH)) {
-            this.session.end("BadPath_ERROR");
-            return;
-        }
-
-        if (!fs.existsSync(absFile)) {
+        log(absPath, this.preferredDirSize);
+        if (!fs.existsSync(absPath)) {
             this.session.end("BadFile_ERROR");
             return;
         }
 
-        log(`STATING ${localPath} from "${this.session.config.FILEPATH}" `);
+        log(`LISTING "${absPath}", Page ${dirPage}`);
 
-        const stats = fs.statSync(absFile);
-
-        if(stats.size > MAX_FILE_SIZE) {
-            this.session.end("FileTooBig_ERROR");
-            return;
-        }
-
-        const filename = path.basename(absFile);
-
-        if(filename.length>127) {
-            const error = new TextEncoder().encode("FilenameTooLong_ERROR").toString();
-            this.session.end(error);
-            this.state = "Q";        // QUIT
-            return;
-        }
-
-        this.totalBlocks = Math.floor(stats.size / this.preferredBlockSize);
-        this.remainder = stats.size % this.preferredBlockSize;
-
-        log(` Size:\t${stats.size>>24}|${(stats.size>>16)&255}|${(stats.size>>8)&255}|${stats.size&255}\n` +
-            ` Blocks:\t${this.totalBlocks>>24}|${(this.totalBlocks>>16)&255}|${(this.totalBlocks>>8)&255}|${this.totalBlocks&255}\n` +
-            ` Remainder:\t${this.remainder} ${(this.remainder >> 8)} ${(this.remainder & 255)}\n` +
-            ` Filename:\t${filename}`);
-
-        this.checksum = 0;
-
-        fs.open(absFile, 'r',  (err, fd) => {
+        fs.readdir(absPath,  (err, files) => {
             if (err) {
                 this.session.end("ServerException_ERROR");
             } else {
-                this.fileHandle = fd;
-                // Send the HEADER
-                this.session.socket.write(Uint8Array.from([
-                    // Protocol Version    Uint8
-                    2,
-                    // Size                Uint32
-                    (stats.size >> 24), (stats.size >> 16) & 255, (stats.size >> 8) & 255, (stats.size) & 255,
-                    // Complete Blocks     Uint32
-                    (this.totalBlocks >> 24), (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks) & 255,
-                    // Bytes Remaining     Uint16
-                    (this.remainder >> 8), this.remainder & 255,
-                ]));
-                // String <128char     UChar
-                this.session.socket.write(filename);
-
-                // Terminating NULL    0x00
-                this.session.socket.write(Uint8Array.from([0]));
+                // First, what page did they ask for
+                const firstFile = (dirPage - 1) * this.preferredDirSize
+                // this.blockData = new Uint8Array(this.blockSize);
+                log(files, firstFile);
+    //
+    //             // Send the DIRHEADER
+    //             this.session.socket.write(Uint8Array.from([
+    //                 // Protocol Version    Uint8
+    //                 PROTOCOL_VERSION,
+    //                 // Total Dir Size                Uint16
+    //                 (files.length >> 8), (files.length) & 255,
+    //                 // Complete Blocks     Uint32
+    //                 (this.totalBlocks >> 24), (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks) & 255,
+    //                 // Bytes Remaining     Uint16
+    //                 (this.remainder >> 8), this.remainder & 255,
+    //             ]));
+    //
+    //             // Terminating NULL    0x00
+    //             this.session.socket.write(Uint8Array.from([0]));
             }
         });
     }
@@ -154,10 +130,6 @@ export class PersonalServer {
         this.state = "S";                                       // Flag in handler
         this.block = 0;
         this.blockSize = this.preferredBlockSize;               // Variable blocksize, we shorten the last to fit
-
-
-
-
 
         const absFile = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory + file);
 
@@ -171,7 +143,7 @@ export class PersonalServer {
             return;
         }
 
-        log(`STATING ${file} from "${this.session.config.FILEPATH}" `);
+        log(`STATING ${absFile}" `);
 
         const stats = fs.statSync(absFile);
 
@@ -191,29 +163,26 @@ export class PersonalServer {
 
         this.totalBlocks = Math.floor(stats.size / this.preferredBlockSize);
         this.remainder = stats.size % this.preferredBlockSize;
-
-        log(` Size:\t${stats.size>>24}|${(stats.size>>16)&255}|${(stats.size>>8)&255}|${stats.size&255}\n` +
-            ` Blocks:\t${this.totalBlocks>>24}|${(this.totalBlocks>>16)&255}|${(this.totalBlocks>>8)&255}|${this.totalBlocks&255}\n` +
-            ` Remainder:\t${this.remainder} ${(this.remainder >> 8)} ${(this.remainder & 255)}\n` +
-            ` Filename:\t${filename}`);
-
         this.checksum = 0;
 
+        log(
+            (stats.size) & 255, (stats.size >> 8) & 255, (stats.size >> 16) & 255, (stats.size >> 24),          // needs a little indian helpe
+        );
         fs.open(absFile, 'r',  (err, fd) => {
             if (err) {
                 this.session.end("ServerException_ERROR");
             } else {
                 this.fileHandle = fd;
-                // Send the HEADER
+                // Send the FILEHEADER
                 this.session.socket.write(Uint8Array.from([
                     // Protocol Version    Uint8
-                    2,
+                    PROTOCOL_VERSION,
                     // Size                Uint32
-                    (stats.size >> 24), (stats.size >> 16) & 255, (stats.size >> 8) & 255, (stats.size) & 255,
+                    (stats.size) & 255, (stats.size >> 8) & 255, (stats.size >> 16) & 255, (stats.size >> 24),          // needs a little indian helper
                     // Complete Blocks     Uint32
-                    (this.totalBlocks >> 24), (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks) & 255,
+                    (this.totalBlocks) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 24), // needs a little indian helper
                     // Bytes Remaining     Uint16
-                    (this.remainder >> 8), this.remainder & 255,
+                    this.remainder & 255, (this.remainder >> 8), // needs a little indian helper
                 ]));
                 // String <128char     UChar
                 this.session.socket.write(filename);

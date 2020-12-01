@@ -9,15 +9,17 @@
 
 #define NBNTOOLS_NET_H
 
+#define NET_GetUChar                    UART_GetUChar
+#define NET_GetUInt16                   UART_GetUInt16
+#define NET_GetUInt32                   UART_GetUInt32
 
 #define NET_Send                        UART_Send
-#define NET_GetUChar                    UART_GetUChar
 #define NET_PutCh                       UART_PutCh
 
-int NET_Command(char command[], uint8_t len);
+int NET_Command(char command[], uint8_t len) __z88dk_fastcall;
 //int NET_Send(char command[], uint8_t len);
 void NET_Close();
-uint8_t NET_GetOK(bool localecho);
+uint8_t NET_GetOK(bool localecho) __z88dk_fastcall;
 void NET_Connect(char* server, char* port);
 void NET_ModeSingle();
 void NET_ModeMulti();
