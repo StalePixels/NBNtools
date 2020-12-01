@@ -11,7 +11,7 @@
 
 static bool uartVerbose = false;
 
-void UART_SetVerbose(bool status) {
+void UART_SetVerbose(bool status) __z88dk_fastcall {
     uartVerbose = status;
 }
 
@@ -27,7 +27,7 @@ unsigned char UART_GetUChar() {
     exit((int)err_timeout_byte);
 }
 
-void UART_GetUInt16(uint8_t* val) {
+void UART_GetUInt16(uint8_t* val) __z88dk_fastcall {
     *val = UART_GetUChar();
     ++val;
     *val = UART_GetUChar();
@@ -43,7 +43,7 @@ void UART_GetUInt32(uint8_t* val) {
     *val = UART_GetUChar();
 }
 
-void UART_Send(char *command, uint8_t len) {
+void UART_Send(char command[], uint8_t len) {
     uint8_t command_letter = 0;
 
     for(;len!=0;len--) {

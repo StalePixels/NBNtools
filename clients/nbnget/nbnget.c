@@ -55,6 +55,7 @@ static unsigned char defaultPort[] = "48128";
 static uint8_t customServer = 0;
 static uint8_t customPort = 0;
 static uint8_t fileArg = 1;
+static bool verbose = 0;
 static bool resetWifi = false;
 
 // App state
@@ -165,7 +166,7 @@ int main(int argc, char** argv) {
     IO_UART_BAUD_RATE = ((prescalar >> 7) & 0x7f) | 0x80;   // upper 7 bits
 
     errno = 0;
-    errno = NET_GetOK(true); // We always want localecho here, because it shows up hung wifi modules that way...
+    errno = NET_GetOK(verbose);
 
     if(errno || resetWifi) {
         printf("Closing Existing connections...\n");
@@ -267,7 +268,7 @@ begin_transfer:
     printAtStr( 9, 6, "                      ");
     SPUI_line(9, 6, SPUI_LINE_LEFT);
     SPUI_line(9, 27, SPUI_LINE_RIGHT);
-    printf("\x16%c%c Name: %14s ", 6, 10, filename);
+    printf("\x16%c%c Name: %.14s ", 6, 10, filename);
     SPUI_line(10, 6, SPUI_LINE_LEFT);
     SPUI_line(10, 27, SPUI_LINE_RIGHT);
     printf("\x16%c%c Size: %8lu bytes ", 6, 11, size);

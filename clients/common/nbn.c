@@ -91,9 +91,8 @@ bool NBN_GetDirectory(uint16_t directoryPage) {
         exit((int)err_wrong_version);
     }
     // Get the DIRHEADER
-    uint16_t directorySize = NET_GetUChar();
-    directorySize = (directorySize<<8);
-    directorySize = directorySize + NET_GetUChar();
+    uint16_t directorySize;
+    NET_GetUInt16(&directorySize);
 
 //    NBN_GetBlock(directorySize);
 }
