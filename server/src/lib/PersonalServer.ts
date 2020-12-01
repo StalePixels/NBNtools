@@ -106,21 +106,21 @@ export class PersonalServer {
                 const firstFile = (dirPage - 1) * this.preferredDirSize
                 // this.blockData = new Uint8Array(this.blockSize);
                 log(files, firstFile);
-    //
-    //             // Send the DIRHEADER
-    //             this.session.socket.write(Uint8Array.from([
-    //                 // Protocol Version    Uint8
-    //                 PROTOCOL_VERSION,
-    //                 // Total Dir Size                Uint16
-    //                 (files.length >> 8), (files.length) & 255,
-    //                 // Complete Blocks     Uint32
-    //                 (this.totalBlocks >> 24), (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks) & 255,
-    //                 // Bytes Remaining     Uint16
-    //                 (this.remainder >> 8), this.remainder & 255,
-    //             ]));
-    //
-    //             // Terminating NULL    0x00
-    //             this.session.socket.write(Uint8Array.from([0]));
+
+                // Send the DIRHEADER
+                this.session.socket.write(Uint8Array.from([
+                    // Protocol Version    Uint8
+                    PROTOCOL_VERSION,
+                    // Total Dir Size                Uint16
+                    (files.length >> 8), (files.length) & 255,
+                    // Complete Blocks     Uint32
+                    (this.totalBlocks >> 24), (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks) & 255,
+                    // Bytes Remaining     Uint16
+                    (this.remainder >> 8), this.remainder & 255,
+                ]));
+
+                // Terminating NULL    0x00
+                this.session.socket.write(Uint8Array.from([0]));
             }
         });
     }
