@@ -207,20 +207,7 @@ get_file:
     NET_Send(argv[fileArg], strlen(argv[fileArg]));
     NET_Send("\x0A", 1);
 
-    errno = NET_GetUChar();
-    if(errno!=2) {              // VALIDATE PROTOCOL VERSION
-        if(errno&64) {          // And, check that the character was ASCII, Protocols only ever go up to V63,
-                                //  so if we get back a bit7(64+) char, we know it's not a protocol header...
-                                //
-                                // Now generate an error, the first character of which is already in errno...
-            printf("\n Server Said: %c", errno);
-            NET_GetOK(true);
-            exit((int)err_file_not_found);
-        }
-
-        exit((int)err_wrong_version);
-    }
-
+    NBN_CheckVersionByte();
     NET_GetUInt32(&size);
     NET_GetUInt32(&blocks);
     NET_GetUInt16(&remainder);
@@ -258,17 +245,14 @@ begin_transfer:
     printPaper(INK_BLACK);
     printBrightOn();
     printAtStr( 8, 6, " NextBestNetwork      ");
-    SPUI_triangle(8,22, PAPER_BLACK  | INK_RED    | BRIGHT);
-    SPUI_triangle(8,23, PAPER_RED    | INK_YELLOW | BRIGHT);
-    SPUI_triangle(8,24, PAPER_YELLOW | INK_GREEN  | BRIGHT);
-    SPUI_triangle(8,25, PAPER_GREEN  | INK_CYAN   | BRIGHT);
-    SPUI_triangle(8,26, PAPER_CYAN   | INK_BLACK  | BRIGHT);
+
+    SPUI_logo(8,22);
     printInk(INK_BLACK);
     printPaper(INK_WHITE);
     printAtStr( 9, 6, "                      ");
     SPUI_line(9, 6, SPUI_LINE_LEFT);
     SPUI_line(9, 27, SPUI_LINE_RIGHT);
-    printf("\x16%c%c Name: %.14s ", 6, 10, filename);
+    printf("\x16%c%c Name: %-14s ", 6, 10, filename);
     SPUI_line(10, 6, SPUI_LINE_LEFT);
     SPUI_line(10, 27, SPUI_LINE_RIGHT);
     printf("\x16%c%c Size: %8lu bytes ", 6, 11, size);

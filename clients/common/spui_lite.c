@@ -57,3 +57,11 @@ void SPUI_line(uint8_t row, uint8_t col, uint8_t spui_line) {
     addr = addr + 256;
     *addr = bottom;
 }
+
+void SPUI_logo(uint8_t row, uint8_t col) {
+    SPUI_triangle(row,col, PAPER_BLACK  | INK_RED    | BRIGHT);
+    SPUI_triangle(row,++col, PAPER_RED    | INK_YELLOW | BRIGHT);
+    SPUI_triangle(row,++col, PAPER_YELLOW | INK_GREEN  | BRIGHT);
+    SPUI_triangle(row,++col, PAPER_GREEN  | INK_CYAN   | BRIGHT);
+    SPUI_triangle(row,++col, PAPER_CYAN   | INK_BLACK  | BRIGHT);
+}

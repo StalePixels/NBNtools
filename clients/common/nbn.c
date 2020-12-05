@@ -15,6 +15,7 @@
 
 uint8_t nbnBottom8KPage = 0, nbnTop8KPage = 0;
 unsigned char *nbnBlock = 0x4000;
+unsigned char nbnBuff[260];
 
 bool NBN_Malloc() {
     nbnBottom8KPage = esx_ide_bank_alloc(0);
@@ -71,29 +72,36 @@ bool NBN_GetBlock(uint16_t blockSize) {
     return false;
 }
 
-bool NBN_GetDirectory(uint16_t directoryPage) {
-    char pageBuff[6];
-    sprintf(pageBuff, "%d", directoryPage);
-    NET_Send("DIR ", 4);
-    NET_Send(pageBuff, strlen(pageBuff));
-    NET_Send("\x0A\x0D", 2);
+void NBN_CheckVersionByte() {
     errno = NET_GetUChar();
-    if(errno!=2) {              // VALIDATE PROTOCOL VERSION
+
+    if(errno!=NBN_PROTOCOL_VERSION) {              // VALIDATE PROTOCOL VERSION
         if(errno&64) {          // And, check that the character was ASCII, Protocols only ever go up to V63,
             //  so if we get back a bit7(64+) char, we know it's not a protocol header...
             //
             // Now generate an error, the first character of which is already in errno...
             printf("\n Server Said: %c", errno);
-            NET_GetOK(true);
+            NET_WaitOK(true);
             exit((int)err_nbn_protocol);
         }
 
         exit((int)err_wrong_version);
     }
-    // Get the DIRHEADER
-    uint16_t directorySize;
-    NET_GetUInt16(&directorySize);
+}
 
+bool NBN_GetDirectory(nbnDirectory_t *dir) {
+    sprintf(nbnBuff, "DIR %d\x0A\x0D", dir->currentPage);
+    NET_Send(nbnBuff, strlen(nbnBuff));
+    errno = NET_GetUChar();
+
+    NBN_CheckVersionByte();
+    // Get the DIRHEADER
+    uint16_t poop;
+    NET_GetUInt16(&poop);
+//    NET_GetUInt16(&(dir->totalPages));
+    printf("!%d!", poop);
+//    NET_GetUInt16(&dir->);
+    dir->currentPageSize = NET_GetUChar();
 //    NBN_GetBlock(directorySize);
 }
 

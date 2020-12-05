@@ -14,5 +14,6 @@
 
 void SPUI_triangle(uint8_t row, uint8_t col, uint8_t attr);
 void SPUI_line(uint8_t row, uint8_t col, uint8_t spui_line);
+void SPUI_logo(uint8_t row, uint8_t col);
 
 #endif //SPUI_LITE_H
