@@ -23,7 +23,7 @@ const getConfig = (paramName: string): any => {
 };
 
 const checkPath = (userPath: string): any => {
-  const publicPath = path.resolve(userPath)+path.sep;
+  const publicPath = path.resolve(userPath);
 
   if(!fs.existsSync(publicPath)) {
     log(`ERROR: public path (${publicPath}) does not exist`);

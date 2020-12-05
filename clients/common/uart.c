@@ -29,18 +29,14 @@ unsigned char UART_GetUChar() {
 
 void UART_GetUInt16(uint8_t* val) __z88dk_fastcall {
     *val = UART_GetUChar();
-    ++val;
-    *val = UART_GetUChar();
+    *(++val) = UART_GetUChar();
 }
 
 void UART_GetUInt32(uint8_t* val) {
     *val = UART_GetUChar();
-    ++val;
-    *val = UART_GetUChar();
-    ++val;
-    *val = UART_GetUChar();
-    ++val;
-    *val = UART_GetUChar();
+    *(++val) = UART_GetUChar();
+    *(++val) = UART_GetUChar();
+    *(++val) = UART_GetUChar();
 }
 
 void UART_Send(char command[], uint8_t len) {

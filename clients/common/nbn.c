@@ -92,17 +92,20 @@ void NBN_CheckVersionByte() {
 bool NBN_GetDirectory(nbnDirectory_t *dir) {
     sprintf(nbnBuff, "DIR %d\x0A\x0D", dir->currentPage);
     NET_Send(nbnBuff, strlen(nbnBuff));
-    errno = NET_GetUChar();
 
     NBN_CheckVersionByte();
     // Get the DIRHEADER
-    uint16_t poop;
-    NET_GetUInt16(&poop);
-//    NET_GetUInt16(&(dir->totalPages));
-    printf("!%d!", poop);
-//    NET_GetUInt16(&dir->);
+    uint8_t dirLen = 0;
+    uint8_t chr = NET_GetUInt8();
+    while(chr) {
+        dir->currentPath[dirLen++] = chr;
+        chr = NET_GetUInt8();
+    }
+    dir->currentPath[dirLen] = chr;
+    NET_GetUInt16(&(dir->totalEntries));
+    NET_GetUInt16(&(dir->currentPage));
     dir->currentPageSize = NET_GetUChar();
-//    NBN_GetBlock(directorySize);
+    NET_GetUInt16(&(dir->totalPages));
 }
 
 bool NBN_WriteBlock(uint8_t fileHandle, uint16_t blockSize) {

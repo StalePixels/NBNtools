@@ -35,7 +35,7 @@ export class PersonalServer {
         this.preferredBlockSize = DEFAULT_BLOCK_SIZE;
         this.preferredDirSize = DEFAULT_DIR_SIZE;
         this.checksumBase = DEFAULT_CHECKSUM;
-        this.currentWorkingDirectory = ''
+        this.currentWorkingDirectory = '/'
 
         log(`PersonalServer created for ${this.session.socket.remoteAddress}:${this.session.socket.remotePort}` );
     }
@@ -48,7 +48,7 @@ export class PersonalServer {
             case "LS":
             case "CAT":
             case "DIR":
-                this.sendDir(parseInt(params[0]));
+                this.sendDir(params);
                 break;
             case "QUIT":
                 this.session.end("OK");
@@ -87,16 +87,26 @@ export class PersonalServer {
         }
     }
 
-    private sendDir(dirPage = 1): void {
-        const absPath = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory);
+    private sendDir(params: readonly string[] = []): void {
+        const absPath = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory)+path.sep;
+        let dirPage = parseInt(params[0], 10);
 
-        log(absPath, this.preferredDirSize);
         if (!fs.existsSync(absPath)) {
             this.session.end("BadFile_ERROR");
             return;
         }
 
-        log(`LISTING "${absPath}", Page ${dirPage}`);
+        if (!dirPage) {
+            dirPage = 1;
+        }
+
+        function concatTypedArrays(a, b) { // a, b TypedArray of same type
+            const c = new (a.constructor)(a.length + b.length);
+            c.set(a, 0);
+            c.set(b, a.length);
+            return c;
+        }
+        const relPath = absPath.replace(this.session.config.FILEPATH, '');
 
         fs.readdir(absPath,  (err, files) => {
             if (err) {
@@ -104,23 +114,36 @@ export class PersonalServer {
             } else {
                 // First, what page did they ask for
                 const firstFile = (dirPage - 1) * this.preferredDirSize
-                // this.blockData = new Uint8Array(this.blockSize);
-                log(files, firstFile);
+                const totalPages = Math.floor(files.length / 16) + 1;
+                let page = [];
+
+                page = files.slice(firstFile, this.preferredDirSize);
+
+                let header = new Uint8Array();
+                // VER                                  Uint8 (<=63)
+                header = concatTypedArrays(header, [PROTOCOL_VERSION]);
+                // Path                                 NULL terminated string
+                header = concatTypedArrays(header, new TextEncoder().encode(relPath));
+                header = concatTypedArrays(header, [0]);
+                // Total Entries in this dir            Uint16
+                header = concatTypedArrays(header, [(files.length) & 255, (files.length >> 8)]);
+                // Current Page Number                  Uint16
+                header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8)]);
+                // Current Page Size                    Uint8
+                header = concatTypedArrays(header, [page.length]);
+                // Total Pages in the dir               Uint16
+                header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
 
                 // Send the DIRHEADER
-                this.session.socket.write(Uint8Array.from([
-                    // Protocol Version    Uint8
-                    PROTOCOL_VERSION,
-                    // Total Dir Size                Uint16
-                    (files.length >> 8), (files.length) & 255,
-                    // Complete Blocks     Uint32
-                    (this.totalBlocks >> 24), (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks) & 255,
-                    // Bytes Remaining     Uint16
-                    (this.remainder >> 8), this.remainder & 255,
-                ]));
+                this.session.socket.write(header);
 
-                // Terminating NULL    0x00
-                this.session.socket.write(Uint8Array.from([0]));
+                page.forEach( (entry) => {
+                    const fileStat = fs.statSync(absPath+"/"+entry);
+                    const filesize = fileStat.size;
+                    const filetype = fileStat.isDirectory() ? 0 : 1;
+
+                    log("NAME: "+entry+" SIZE: "+filesize+" TYPE: "+ filetype);
+                });
             }
         });
     }
@@ -155,8 +178,7 @@ export class PersonalServer {
         const filename = path.basename(absFile);
 
         if(filename.length>127) {
-            const error = new TextEncoder().encode("FilenameTooLong_ERROR").toString();
-            this.session.end(error);
+            this.session.end("FilenameTooLong_ERROR");
             this.state = "Q";        // QUIT
             return;
         }

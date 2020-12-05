@@ -27,6 +27,7 @@
 
 // App state
 typedef struct {
+    unsigned char *currentPath;
     uint16_t totalEntries;
     uint16_t currentPage;
     uint8_t currentPageSize;
