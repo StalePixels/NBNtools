@@ -261,11 +261,15 @@ export class PersonalServer {
 
         if(!absFile.startsWith(this.session.config.FILEPATH)) {
             this.session.socket.write("BadPath_ERROR");
+            this.session.state = "W";
+            this.session.socket.write(Uint8Array.from([13,10]));
             return;
         }
 
         if (!fs.existsSync(absFile)) {
             this.session.socket.write("NoFile_ERROR");
+            this.session.state = "W";
+            this.session.socket.write(Uint8Array.from([13,10]));
             return;
         }
 
@@ -274,7 +278,8 @@ export class PersonalServer {
         const stats = fs.statSync(absFile);
 
         if(stats.size > MAX_FILE_SIZE) {
-            this.session.end("FileTooBig_ERROR");
+            this.session.socket.write("FileTooBig_ERROR");
+            this.session.socket.write(Uint8Array.from([13,10]));
             return;
         }
 
