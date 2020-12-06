@@ -49,7 +49,7 @@ bool resetWifi = false;
 
 unsigned char directoryPath[254] = "/";
 unsigned char commandBuffer[254] = "";
-unsigned char historyBuffer[254] = "";
+//unsigned char historyBuffer[254] = "";
 nbnDirectory_t dirState;
 
 uint8_t commandLen;
@@ -146,6 +146,16 @@ uint8_t get_key(void) {
     return next_key;
 }
 
+uint8_t idx;
+void wipeWorkspace() {
+    printAt(2,1);
+
+    for (idx = 2 ;idx < 22; idx++) {
+        printf("%64s", "");
+    }
+}
+
+
 #define SHELL_MODE_COMMAND  0
 #define SHELL_MODE_DIR      1
 uint8_t shellMode;
@@ -181,8 +191,14 @@ command_next_key:
 }
 
 void shellProcessCommand() {
-    char* command;
+    char* command = commandBuffer;
 
+    // Ignore blank strings space
+    while(isspace((unsigned char)*command)) command++;
+    if(*command == 0) return;
+
+    wipeWorkspace();
+//    strcpy(historyBuffer, commandBuffer);
 reparse:
     printPaper(INK_BLACK); printInk(INK_WHITE);
     printAt(2,1); printf("EXECing ");
@@ -191,6 +207,7 @@ reparse:
     printPaper(INK_BLACK); printInk(INK_WHITE);
     printf("  ");
     printPaper(INK_WHITE); printInk(INK_BLACK); printBrightOff();
+
     command = strtok(commandBuffer, " ");
     if (!*command) return;
     char* arg = strtok(NULL, "");
@@ -248,7 +265,6 @@ reparse:
         nbnDirectoryEntry_t *entry = nbnBlock;
         nbnDirectoryEntry_t *copy = nbnBuff;
         printAt(3, 0);
-        uint8_t idx;
         for (idx = 0; idx < dirState.currentPageSize; idx++) {
             NBN_PageIn();
             memcpy(nbnBuff, entry, 6 + strlen(entry->name));
@@ -276,9 +292,6 @@ reparse:
             // Gnarly pointer maths is gnarly
             entry = (uint16_t) entry + 6 + strlen(((nbnDirectoryEntry_t *) &nbnBuff)->name);
         }
-        for (;idx < NBN_DEFAULT_DIRPAGE; idx++) {
-            printf("%64s", "");
-        }
         printAtStr(20, 0, "    ");
         if (dirState.currentPage > 1) {
             shellMode = SHELL_MODE_DIR;
@@ -298,6 +311,29 @@ reparse:
             shellMode = SHELL_MODE_COMMAND;
             printf("               DIRECTORY LISTING COMPLETE");
         }
+        return;
+    }
+    else if(!stricmp(command, "CD")) {
+
+        if(NBN_ChangeDirectory((unsigned char *)arg)=='!') {
+//             Directory exists, handle the action
+            strcpy(dirState.currentPath, arg);
+            printAtStr(4, 4, "Change Directory successful");
+            NBN_ParseDirectoryHeader(&dirState);
+        }
+        else {
+            printPaper(INK_RED); printInk(INK_BLACK); printBrightOn(); printFlashOn();
+            printAtStr(4,5,  "ERROR: ");
+            printFlashOff(); printBrightOff();
+            printf("Change Directory FAILED! ");
+            printPaper(INK_CYAN); printInk(INK_BLACK); printBrightOn();
+            printf(" (Does it exist?)");
+            printPaper(INK_WHITE);  printBrightOff();
+        }
+
+        strcpy(commandBuffer, "CONNECTED");
+        shellPrintStatus();
+
         return;
     }
 }
@@ -425,8 +461,6 @@ ready:
 
     uint8_t shellMode = SHELL_MODE_COMMAND;
 get_command:
-    strcpy(historyBuffer, commandBuffer);
-
     shellGetCommand();
     shellProcessCommand();
 
