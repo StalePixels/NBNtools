@@ -174,18 +174,26 @@ export class PersonalServer {
 
         const relPath = absPath.replace(this.session.config.FILEPATH, '');
 
+        log(this.session.config.FILEPATH.length, this.session.config.FILEPATH, absPath.length, absPath);
         fs.readdir(absPath,  (err, files) => {
             if (err) {
                 this.session.end("ServerException_ERROR");
             } else {
+                let dirList = [];
+                if(absPath.length - this.session.config.FILEPATH.length > 1) {
+                    // cheap and cheerful subdir checking
+                    dirList[0] = "..";
+                }
+
+                dirList = dirList.concat(files);
                 // First, what page did they ask for
                 let dirPage = parseInt(params[0], 10);
                 if (!dirPage) {
                     dirPage = 1;
                 }
                 const directoryOffset = (dirPage - 1) * this.preferredDirSize
-                const totalPages = Math.ceil(files.length / this.preferredDirSize );
-                const page = files.slice(directoryOffset, directoryOffset+this.preferredDirSize);
+                const totalPages = Math.ceil(dirList.length / this.preferredDirSize );
+                const page = dirList.slice(directoryOffset, directoryOffset+this.preferredDirSize);
 
                 let listing = new Uint8Array();
                 page.forEach( (entry) => {
@@ -213,8 +221,8 @@ export class PersonalServer {
                 header = concatTypedArrays(header, [0]);
 
                 // Total Entries in this dir            Uint16
-                header = concatTypedArrays(header, [(files.length) & 255, (files.length >> 8)]);
-log(dirPage);
+                header = concatTypedArrays(header, [(dirList.length) & 255, (dirList.length >> 8)]);
+
                 // Current Page Number                  Uint16
                 header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8) & 255]);
 
