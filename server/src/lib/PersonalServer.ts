@@ -13,6 +13,14 @@ const PROTOCOL_VERSION = 2;
 const NBN_COMMAND_NEXT = "!".charCodeAt(0);
 const NBN_COMMAND_BACK = "<".charCodeAt(0);
 
+// tslint:disable-next-line:typedef
+function concatTypedArrays(a, b) { // a, b TypedArray of same type
+    const c = new (a.constructor)(a.length + b.length);
+    c.set(a, 0);
+    c.set(b, a.length);
+    return c;
+}
+
 export class PersonalServer {
     private block: number;
     private blockData: Uint8Array;
@@ -41,14 +49,16 @@ export class PersonalServer {
     }
 
     public command(cmd: string, params: readonly string[]): void {
+        log("COMMAND "+cmd+" WITH "+params);
         switch (cmd) {
             case "GET":
                 this.sendFile(params.join(' '));
                 break;
-            case "LS":
-            case "CAT":
             case "DIR":
                 this.sendDir(params);
+                break;
+            case "CD":
+                this.changeDir(params.join(' '));
                 break;
             case "QUIT":
                 this.session.end("OK");
@@ -87,25 +97,81 @@ export class PersonalServer {
         }
     }
 
+    private changeDir(dir: string): void {
+        const absPath = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory + path.sep + dir)+path.sep;
+
+        if (!fs.existsSync(absPath)) {
+            this.session.socket.write(Uint8Array.from([60, 13, 10]));
+            return;
+        }
+
+        if(!fs.statSync(absPath).isDirectory()) {
+            this.session.socket.write(Uint8Array.from([60, 13, 10]));
+            return;
+        }
+
+        if(!absPath.startsWith(this.session.config.FILEPATH)) {
+            this.session.socket.write(Uint8Array.from([60, 13, 10]));
+            return;
+        }
+
+        this.session.socket.write(Uint8Array.from([33, 13, 10]));
+
+        const relPath = absPath.replace(this.session.config.FILEPATH, '');
+
+        this.currentWorkingDirectory = relPath;
+
+        log(absPath, this.currentWorkingDirectory);
+        fs.readdir(absPath,  (err, files) => {
+            if (err) {
+                this.session.end("ServerException_ERROR");
+            } else {
+                // First, what page did they ask for
+                const dirPage = 1;
+                const directoryOffset = (dirPage - 1) * this.preferredDirSize
+                const totalPages = Math.ceil(files.length / this.preferredDirSize );
+                const page = files.slice(directoryOffset, directoryOffset+this.preferredDirSize);
+
+                let header = new Uint8Array();
+                // VER                                  Uint8 (<=63)
+                header = concatTypedArrays(header, [PROTOCOL_VERSION]);
+
+                // Path                                 NULL terminated string
+                header = concatTypedArrays(header, new TextEncoder().encode(this.currentWorkingDirectory));
+                header = concatTypedArrays(header, [0]);
+
+                // Total Entries in this dir            Uint16
+                header = concatTypedArrays(header, [(files.length) & 255, (files.length >> 8)]);
+
+                // Current Page Number                  Uint16
+                header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8) & 255]);
+
+                // Current Page Size                    Uint8
+                header = concatTypedArrays(header, [page.length]);
+
+                // Total Pages in the dir               Uint16
+                header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
+
+                // Send the DIRHEADER
+                this.session.socket.write(header);
+
+            }
+        });
+    }
+
     private sendDir(params: readonly string[] = []): void {
         const absPath = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory)+path.sep;
-        let dirPage = parseInt(params[0], 10);
 
         if (!fs.existsSync(absPath)) {
             this.session.end("BadFile_ERROR");
             return;
         }
 
-        if (!dirPage) {
-            dirPage = 1;
+        if(!absPath.startsWith(this.session.config.FILEPATH)) {
+            this.session.end("BadFile_ERROR");
+            return;
         }
 
-        function concatTypedArrays(a, b) { // a, b TypedArray of same type
-            const c = new (a.constructor)(a.length + b.length);
-            c.set(a, 0);
-            c.set(b, a.length);
-            return c;
-        }
         const relPath = absPath.replace(this.session.config.FILEPATH, '');
 
         fs.readdir(absPath,  (err, files) => {
@@ -113,37 +179,66 @@ export class PersonalServer {
                 this.session.end("ServerException_ERROR");
             } else {
                 // First, what page did they ask for
-                const firstFile = (dirPage - 1) * this.preferredDirSize
-                const totalPages = Math.floor(files.length / 16) + 1;
-                let page = [];
+                let dirPage = parseInt(params[0], 10);
+                if (!dirPage) {
+                    dirPage = 1;
+                }
+                const directoryOffset = (dirPage - 1) * this.preferredDirSize
+                const totalPages = Math.ceil(files.length / this.preferredDirSize );
+                const page = files.slice(directoryOffset, directoryOffset+this.preferredDirSize);
 
-                page = files.slice(firstFile, this.preferredDirSize);
+                let listing = new Uint8Array();
+                page.forEach( (entry) => {
+                    const fileStat = fs.statSync(absPath+entry);
+                    const filesize = fileStat.size;
+                    const filetype = fileStat.isDirectory() ? 0 : 1;
+
+                    // Current File Size                Uint32
+                    listing = concatTypedArrays(listing, [(filesize) & 255,
+                        (filesize >> 8) & 255, (filesize >> 16) & 255, (filesize >> 24) & 255]);
+
+                    // Current File Type                Uint8
+                    listing = concatTypedArrays(listing, [filetype]);
+                    const entryArray = new TextEncoder().encode(entry);
+                    listing = concatTypedArrays(listing, entryArray)
+                    listing = concatTypedArrays(listing, [0]);
+                });
 
                 let header = new Uint8Array();
                 // VER                                  Uint8 (<=63)
                 header = concatTypedArrays(header, [PROTOCOL_VERSION]);
+
                 // Path                                 NULL terminated string
                 header = concatTypedArrays(header, new TextEncoder().encode(relPath));
                 header = concatTypedArrays(header, [0]);
+
                 // Total Entries in this dir            Uint16
                 header = concatTypedArrays(header, [(files.length) & 255, (files.length >> 8)]);
+log(dirPage);
                 // Current Page Number                  Uint16
-                header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8)]);
+                header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8) & 255]);
+
                 // Current Page Size                    Uint8
                 header = concatTypedArrays(header, [page.length]);
+
                 // Total Pages in the dir               Uint16
                 header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
+
+                // Size of NBNBlock                     Uint16
+                header = concatTypedArrays(header, [(listing.length) & 255, (listing.length >> 8)]);
 
                 // Send the DIRHEADER
                 this.session.socket.write(header);
 
-                page.forEach( (entry) => {
-                    const fileStat = fs.statSync(absPath+"/"+entry);
-                    const filesize = fileStat.size;
-                    const filetype = fileStat.isDirectory() ? 0 : 1;
+                // Send the filenames
 
-                    log("NAME: "+entry+" SIZE: "+filesize+" TYPE: "+ filetype);
-                });
+                this.session.socket.write(listing);
+                this.checksum = 0;
+                for (const letter of listing) {
+                    this.checksum = this.checksum + letter;
+                }
+                this.checksum = this.checksum % this.checksumBase;
+                this.session.socket.write(Uint8Array.from([this.checksum]));
             }
         });
     }

@@ -56,7 +56,7 @@ export class Session {
         this.server.command(cmd, params);
 
         break;
-      case "S":     // data to (NBN)Server
+      case "S":     // data currently being SENT by (NBN)Server
           this.server.data(buffer);
         break;
       default:

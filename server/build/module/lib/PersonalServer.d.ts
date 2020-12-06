@@ -18,6 +18,7 @@ export declare class PersonalServer {
     constructor(session: Session);
     command(cmd: string, params: readonly string[]): void;
     data(buffer: Buffer): void;
+    private changeDir;
     private sendDir;
     private sendFile;
     private readFileBlock;
