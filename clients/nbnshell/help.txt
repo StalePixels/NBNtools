@@ -1,0 +1,14 @@
+.nbnshell [OPTIONS] FILE
+
+NextBestNetwork CDN File Fetcher
+
+options:
+ -h      Show this help screen
+ -s xxxx Alternative Server *
+ -p xxxx Alternative Port
+ -r      Reset WiFi connection
+ -v      Verbose AT protocol log
+
+* WARNING
+ -s changes remote file-source,
+use caution on untrusted servers
