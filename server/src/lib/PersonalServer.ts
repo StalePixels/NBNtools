@@ -260,12 +260,12 @@ export class PersonalServer {
         const absFile = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory + file);
 
         if(!absFile.startsWith(this.session.config.FILEPATH)) {
-            this.session.end("BadPath_ERROR");
+            this.session.socket.write("BadPath_ERROR");
             return;
         }
 
         if (!fs.existsSync(absFile)) {
-            this.session.end("BadFile_ERROR");
+            this.session.socket.write("NoFile_ERROR");
             return;
         }
 
