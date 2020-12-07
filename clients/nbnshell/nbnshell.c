@@ -74,7 +74,7 @@ static void help_and_exit(int exit_value) __z88dk_fastcall {
 
 void shellPrintStatus() {
     printPaper(INK_BLACK); printInk(INK_WHITE); printBrightOn();
-    printAt(1,1); printf("CWD: %-45s %12s", directoryPath, commandBuffer);
+    printAt(1,1); printf("CWD: %-45.45s %12s", directoryPath, commandBuffer);
     printPaper(INK_WHITE); printInk(INK_BLACK); printBrightOff();
 }
 
@@ -203,7 +203,7 @@ reparse:
     printPaper(INK_BLACK); printInk(INK_WHITE);
     printAt(2,1); printf("EXECing ");
     printPaper(INK_WHITE); printInk(INK_BLACK); printBrightOn();
-    printf("%-54s", commandBuffer, dirState.currentPage);
+    printf("%-54.54s", commandBuffer, dirState.currentPage);
     printPaper(INK_BLACK); printInk(INK_WHITE);
     printf("  ");
     printPaper(INK_WHITE); printInk(INK_BLACK); printBrightOff();
@@ -252,14 +252,14 @@ reparse:
         goto reparse;
     }
     /*
-     * The rest of these are our default commandset, and can be run at any time - even in pagination
+     * The rest of these are our default command set, and can be run at any time - even in pagination
      */
     else if(!stricmp(command, "DIR")) {
         dirState.currentPage =  atoi(arg);
         if(!dirState.currentPage) dirState.currentPage = 1;
 
         NBN_GetDirectory(&dirState);
-        sprintf(commandBuffer, "Page: %d/%d", dirState.currentPage, dirState.totalPages);
+        sprintf(commandBuffer, "Page: %d/%d  ", dirState.currentPage, dirState.totalPages);
         shellPrintStatus();
         // THE DIR LISTING IS IN THE NBNBLOCK currently, so now to display that... we can use nbnBuff as a staging area
         nbnDirectoryEntry_t *entry = nbnBlock;
@@ -270,7 +270,7 @@ reparse:
             memcpy(nbnBuff, entry, 6 + strlen(entry->name));
             NBN_PageOut();
 
-            printf(" %-54s ", ((nbnDirectoryEntry_t *) &nbnBuff)->name);
+            printf(" %-54.54s ", ((nbnDirectoryEntry_t *) &nbnBuff)->name);
             switch (((nbnDirectoryEntry_t *) &nbnBuff)->type) {
                 case 0:
                     printf(" <DIR> \n");
@@ -301,8 +301,6 @@ reparse:
             printf("               ");
         }
 
-//            printf("    Q:Terminate DIR Listing   N:Next Page");
-//        }
         if (dirState.currentPage < dirState.totalPages) {
             shellMode = SHELL_MODE_DIR;
             printf("    Q:Terminate DIR Listing   N:Next Page");
@@ -314,9 +312,8 @@ reparse:
         return;
     }
     else if(!stricmp(command, "CD")) {
-
         if(NBN_ChangeDirectory((unsigned char *)arg)=='!') {
-//             Directory exists, handle the action
+            //   Directory exists, handle the action
             strcpy(dirState.currentPath, arg);
             printAtStr(4, 4, "Change Directory successful");
             NBN_ParseDirectoryHeader(&dirState);
@@ -332,6 +329,101 @@ reparse:
         }
 
         strcpy(commandBuffer, "CONNECTED");
+        shellPrintStatus();
+
+        return;
+    }
+    else if(!stricmp(command, "GET")) {
+        uint32_t size, blocks;
+        uint16_t remainder;
+
+        sprintf(commandBuffer, "GET %s\x0A\x0D", arg);
+        NET_Send(commandBuffer, strlen(commandBuffer));
+
+        bool OK = NBN_CheckVersionByte(false);
+        if(!OK) return;
+        NET_GetUInt32(&size);
+        NET_GetUInt32(&blocks);
+        NET_GetUInt16(&remainder);
+
+        // reset index for string len mgmt
+        counter = 0;
+        append_filename:
+        nbnBuff[counter] = NET_GetUChar();
+        if(nbnBuff[counter]==0) goto begin_transfer;
+        counter++;
+        goto append_filename;
+
+        begin_transfer:
+        errno = 0;
+        // Open Write Output
+        file_out = esxdos_f_open(nbnBuff, ESXDOS_MODE_W | ESXDOS_MODE_CT);
+        // Check
+        if (errno)
+        {
+            printf("Could not create:\n %s\n", nbnBuff);
+
+            exit(errno);
+        }
+        printf("\x16%c%cName: %-54.54s", 3, 4, nbnBuff);
+        printf("\x16%c%cSize: %-8lu bytes", 3, 6, size);
+
+        // FOR BLOCKS
+        uint8_t retries = 3;
+
+        for(;blocks>0;blocks--) {
+            printf("\x16%c%cParts Remaining: %lu ", 3, 8, blocks);
+
+            // Send "Get next block" command
+            NET_PutCh(NBN_BLOCK_SUCCESS);
+            NET_Send("1\x0D\x0A", 3);
+
+            receive_next_block:
+            if(!NBN_GetBlock(NBN_MAX_BLOCKSIZE)) {
+                printf("\x16%c%c   Retry(%d)part: %lu ", 3, 8, retries, blocks);
+
+                blocks++;
+                retries--;
+                if(!retries)  exit((int)err_transfer_error);
+
+                UART_PutCh(NBN_BLOCK_FAIL);
+                NET_Send("\x0D\x0A", 2);
+                goto receive_next_block;
+            }
+            else {
+                NBN_WriteBlock(file_out, NBN_MAX_BLOCKSIZE);
+                retries = 3;
+                // Get data
+                NET_PutCh(NBN_BLOCK_SUCCESS);
+                NET_Send("\x0D\x0A", 2);
+            }
+        }
+        NET_Send("!", 1);
+        NET_Send("\x0D\x0A", 2);
+
+        retries = 3;
+
+        receive_last_block:
+        printf("\x16%c%cBytes Remaining: %d ", 3, 8, remainder);
+        if(!NBN_GetBlock(remainder)) {
+            printf("\x16%c%c Retry(%d) bytes: %d ", 3, 8, retries, remainder);
+
+            blocks++;
+            retries--;
+            if(!retries)  exit((int)err_transfer_error);
+
+            UART_PutCh(NBN_BLOCK_FAIL);
+            NET_Send("\x0D\x0A", 2);
+            goto receive_last_block;
+        }
+        else {
+            NBN_WriteBlock(file_out, remainder);
+            printf("\x16%c%cFile transfer complete! ", 3, 8);
+            NET_PutCh(NBN_BLOCK_SUCCESS);
+            NET_Send("\x0D\x0A", 2);
+        }
+
+        strcpy(commandBuffer, "COMPLETE!");
         shellPrintStatus();
 
         return;
@@ -437,6 +529,10 @@ int main(int argc, char** argv) {
             exit((int)err_failed_connection);
         }
     }
+
+    // Disable verbose logging, as we're into "GUI" mode now...
+    UART_SetVerbose(false);     // else is breaks the progress meter
+
 ready:
     zx_cls(PAPER_WHITE);
 
@@ -458,6 +554,12 @@ ready:
     dirState.totalPages = 1;
     strcpy(commandBuffer, "CONNECTED");
     shellPrintStatus();
+
+    if(!NBN_Malloc()) {
+        // DIE DUE TO NO MEMORY
+        printf("NO MEMORY");
+        exit(0);
+    }
 
     uint8_t shellMode = SHELL_MODE_COMMAND;
 get_command:

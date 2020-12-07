@@ -259,6 +259,7 @@ export class PersonalServer {
 
         const absFile = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory + file);
 
+        log(absFile);
         if(!absFile.startsWith(this.session.config.FILEPATH)) {
             this.session.socket.write("BadPath_ERROR");
             this.session.state = "W";

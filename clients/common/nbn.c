@@ -38,8 +38,7 @@ unsigned char NBN_GetStatus() {
     status[2] = UART_GetUChar();
     status[3] = 0;
 
-
-    if((status[0] == '!' || status[0] == '?') && status[1] == '\x0D' && status[2] == '\x0A') {
+    if((status[0] == NBN_BLOCK_SUCCESS || status[0] == NBN_BLOCK_FAIL) && status[1] == '\x0D' && status[2] == '\x0A') {
         return(status[0]);
     } else {
         printf("%s", status);
@@ -48,19 +47,17 @@ unsigned char NBN_GetStatus() {
     }
 }
 
-bool NBN_GetBlock(uint16_t blockSize) {
+bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall {
     uint8_t nbnComputed = 0;
 
-    ZXN_WRITE_MMU2(nbnBottom8KPage);
-    ZXN_WRITE_MMU3(nbnTop8KPage);
+    NBN_PageIn();
     for(uint16_t nbnByte = 0; nbnByte < blockSize; nbnByte++) {
         nbnBlock[nbnByte] = NET_GetUChar();
         // #1. This is basically a glorious hack, keep adding bytes to an uint8, then...
         nbnComputed = nbnComputed + nbnBlock[nbnByte];
         zx_border(nbnBlock[nbnByte]%8);
     }
-    ZXN_WRITE_MMU2(ULA_BOTTOM_PAGE);
-    ZXN_WRITE_MMU3(ULA_TOP_PAGE);
+    NBN_PageOut();
 
     uint8_t nbnChecksum =  NET_GetUChar();
 
@@ -68,12 +65,13 @@ bool NBN_GetBlock(uint16_t blockSize) {
     if(nbnChecksum == nbnComputed) {
         return true;
     }
-
+    printf("%d vs %d\n\n", nbnComputed, nbnChecksum);
     return false;
 }
 
-void NBN_CheckVersionByte() {
+bool NBN_CheckVersionByte(bool fatal) __z88dk_fastcall {
     errno = NET_GetUChar();
+    bool pass = true;
 
     if(errno!=NBN_PROTOCOL_VERSION) {              // VALIDATE PROTOCOL VERSION
         if(errno&64) {          // And, check that the character was ASCII, Protocols only ever go up to V63,
@@ -82,25 +80,35 @@ void NBN_CheckVersionByte() {
             // Now generate an error, the first character of which is already in errno...
             printf("\n Server Said: %c", errno);
             NET_WaitOK(true);
-            exit((int)err_nbn_protocol);
+            if(fatal) {
+                exit((int) err_nbn_protocol);
+            }
+            else {
+                pass = false;
+            }
         }
-
-        exit((int)err_wrong_version);
+        if(fatal) {
+            exit((int) err_wrong_version);
+        }
+        else {
+            pass = false;
+        }
     }
+
+    return pass;
 }
 
-bool NBN_GetDirectory(nbnDirectory_t *dir) {
-    sprintf(nbnBuff, "DIR %d\x0A\x0D", dir->currentPage);
-    NET_Send(nbnBuff, strlen(nbnBuff));
-
-    NBN_CheckVersionByte();
+void NBN_ParseDirectoryHeader(nbnDirectory_t *dir)  __z88dk_fastcall  {
+    NBN_CheckVersionByte(true);
     // Get the DIRHEADER
+    // Copy the filename
     uint8_t dirLen = 0;
     uint8_t chr = NET_GetUInt8();
     while(chr) {
         dir->currentPath[dirLen++] = chr;
         chr = NET_GetUInt8();
     }
+    // now add the NULL
     dir->currentPath[dirLen] = chr;
     NET_GetUInt16(&(dir->totalEntries));
     NET_GetUInt16(&(dir->currentPage));
@@ -108,16 +116,42 @@ bool NBN_GetDirectory(nbnDirectory_t *dir) {
     NET_GetUInt16(&(dir->totalPages));
 }
 
+unsigned char NBN_ChangeDirectory(char *dir) __z88dk_fastcall {
+    sprintf(nbnBuff, "CD %s\x0A\x0D", dir);
+    NET_Send(nbnBuff, strlen(nbnBuff));
+
+    return NBN_GetStatus();
+}
+
+void NBN_StatDirectory(nbnDirectory_t *dir)  __z88dk_fastcall  {
+    sprintf(nbnBuff, "STAT %s\x0A\x0D", dir->currentPath);
+    NET_Send(nbnBuff, strlen(nbnBuff));
+
+    NBN_ParseDirectoryHeader(dir);
+}
+
+void NBN_GetDirectory(nbnDirectory_t *dir)  __z88dk_fastcall  {
+    sprintf(nbnBuff, "DIR %d\x0A\x0D", dir->currentPage);
+    NET_Send(nbnBuff, strlen(nbnBuff));
+
+    // Get the DIRHEADER
+    NBN_ParseDirectoryHeader(dir);
+    uint16_t nbnBlockSize;
+    NET_GetUInt16(&nbnBlockSize);
+
+    if(!NBN_GetBlock(nbnBlockSize))
+        exit((int)err_transfer_error);
+}
+
 bool NBN_WriteBlock(uint8_t fileHandle, uint16_t blockSize) {
     errno = 0;
 
-    ZXN_WRITE_MMU2(nbnBottom8KPage);
-    ZXN_WRITE_MMU3(nbnTop8KPage);
+    NBN_PageIn();
 
     esxdos_f_write(fileHandle, nbnBlock, blockSize);
 
-    ZXN_WRITE_MMU2(ULA_BOTTOM_PAGE);
-    ZXN_WRITE_MMU3(ULA_TOP_PAGE);
+
+    NBN_PageOut();
 
     if(errno) {
         return false;

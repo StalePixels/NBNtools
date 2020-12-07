@@ -207,7 +207,7 @@ get_file:
     NET_Send(argv[fileArg], strlen(argv[fileArg]));
     NET_Send("\x0A", 1);
 
-    NBN_CheckVersionByte();
+    NBN_CheckVersionByte(true);
     NET_GetUInt32(&size);
     NET_GetUInt32(&blocks);
     NET_GetUInt16(&remainder);
@@ -252,7 +252,7 @@ begin_transfer:
     printAtStr( 9, 6, "                      ");
     SPUI_line(9, 6, SPUI_LINE_LEFT);
     SPUI_line(9, 27, SPUI_LINE_RIGHT);
-    printf("\x16%c%c Name: %-14s ", 6, 10, filename);
+    printf("\x16%c%c Name: %-14.14s ", 6, 10, filename);
     SPUI_line(10, 6, SPUI_LINE_LEFT);
     SPUI_line(10, 27, SPUI_LINE_RIGHT);
     printf("\x16%c%c Size: %8lu bytes ", 6, 11, size);
