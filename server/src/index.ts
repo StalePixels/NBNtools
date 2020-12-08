@@ -12,6 +12,7 @@ const defaultConfig = {
   IP: '0.0.0.0',
   PORT: 48128,
   RETRY: 1000,
+  SHOWDOTS: false
 };
 
 const getConfig = (paramName: string): any => {
@@ -39,6 +40,7 @@ const config = {
   IP: getConfig("IP"),
   PORT: getConfig("PORT"),
   RETRY: getConfig("RETRY"),
+  SHOWDOTS: getConfig("SHOWDOTS"),
 };
 
 // 'connection' listener.

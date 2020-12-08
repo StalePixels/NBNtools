@@ -126,6 +126,24 @@ export class PersonalServer {
             if (err) {
                 this.session.end("ServerException_ERROR");
             } else {
+
+                // Part Zero, check the config, and see if we show hidden folders or not..
+                // @ts-ignore: readonly-array
+                let dirList:  string[] = [];
+                if(absPath.length - this.session.config.FILEPATH.length > 1) {
+                    // cheap and cheerful subdir checking
+                    dirList[0] = "..";
+                }
+                if(this.session.config.SHOWDOTS === false) {
+                    files.forEach((file) => {
+                        if(!file.startsWith(".")) {
+                            dirList.push(file);
+                        }
+                    });
+                } else {
+                    dirList = dirList.concat(files);
+                }
+
                 // First, what page did they ask for
                 const dirPage = 1;
                 const directoryOffset = (dirPage - 1) * this.preferredDirSize
@@ -179,13 +197,23 @@ export class PersonalServer {
             if (err) {
                 this.session.end("ServerException_ERROR");
             } else {
-                let dirList = [];
+                // Part Zero, check the config, and see if we show hidden folders or not..
+                // @ts-ignore: readonly-array
+                let dirList:  string[] = [];
                 if(absPath.length - this.session.config.FILEPATH.length > 1) {
                     // cheap and cheerful subdir checking
                     dirList[0] = "..";
                 }
+                if(this.session.config.SHOWDOTS === false) {
+                    files.forEach((file) => {
+                        if(!file.startsWith(".")) {
+                            dirList.push(file);
+                        }
+                    });
+                } else {
+                    dirList = dirList.concat(files);
+                }
 
-                dirList = dirList.concat(files);
                 // First, what page did they ask for
                 let dirPage = parseInt(params[0], 10);
                 if (!dirPage) {
