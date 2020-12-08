@@ -7,4 +7,4 @@ coverage
 config.json
 yarn.lock
 public/*
-src/cdn/*
+src/lib/CDNServer/*

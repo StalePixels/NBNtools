@@ -74,7 +74,7 @@ static void help_and_exit(int exit_value) __z88dk_fastcall {
 
 void shellPrintStatus() {
     printPaper(INK_BLACK); printInk(INK_WHITE); printBrightOn();
-    printAt(1,1); printf("CWD: %-45.45s %12.12s", directoryPath, commandBuffer);
+    printAt(1,1); printf("CWD: %-43.43s %14.14s", directoryPath, commandBuffer);
     printPaper(INK_WHITE); printInk(INK_BLACK); printBrightOff();
 }
 

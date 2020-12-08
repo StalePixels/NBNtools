@@ -1,8 +1,8 @@
 import * as net from 'net'
 import { TextEncoder } from "util";
-import {log} from './Logger';
-// import { NBNServer } from './NBNServer/NBNServer';
-import { PersonalServer } from './PersonalServer';
+// import {CDNServer as Server} from './CDNServer/CDNServer';
+import { PersonalServer as Server } from './PersonalServer';
+import { log } from './Logger';
 
 function concatTypedArrays(a: any, b: any): any { // a, b TypedArray of same type
   const c = new (a.constructor)(a.length + b.length);
@@ -16,7 +16,7 @@ export class Session {
   public socket: net.Socket;
   public state: string;
 
-  private server: PersonalServer;
+  private server: Server;
 
   constructor(socket: net.Socket, config: any) {
     this.config = config;
@@ -32,8 +32,10 @@ export class Session {
      *   NBNServer is the CLOSED SOURCE module that has houses our special network source (catalogs, service
      *   gateways, and other planned features)
      */
-    this.server = new PersonalServer(this);
+    this.server = new Server(this);
     this.state = "W";       // WAITING for command
+
+    log(Server);
 
     // Set up socket listeners
     socket.on("data", (buffer) => {
