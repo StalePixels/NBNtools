@@ -68,3 +68,6 @@ install:
 q: dotn install
 
 deploy: all install
+
+watch:
+	nodemon -w ../common -w . -e "c,h,asm,lst" --exec "make q||exit 1"
