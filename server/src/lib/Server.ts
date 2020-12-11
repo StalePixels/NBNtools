@@ -202,7 +202,7 @@ export class Server {
     protected changeDir(dir: string): void {
         let absPath: string;
 
-        absPath  = path.resolve(absPath === '/' ? (this.session.config.FILEPATH) :
+        absPath  = path.resolve(dir.startsWith('/') ? (this.session.config.FILEPATH + dir + path.sep) :
             ( this.session.config.FILEPATH + this.currentWorkingDirectory + path.sep + dir + path.sep )
         );
 
