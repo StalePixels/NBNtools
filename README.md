@@ -4,15 +4,12 @@ A series of tools used to run, maintain, or access NextBestNetwork, including pr
 ## Clients
 These run "small" computers
 
-### .NBNput
+### .NBNshell
 
 ### .NBNget
 
 ## Servers
 Apps and frameworks for "big" computers
-
-### NextPi
-NextPi specific server functions
 
 ### PersonalServer
 
