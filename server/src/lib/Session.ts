@@ -1,7 +1,12 @@
 import * as net from 'net'
 import { TextEncoder } from "util";
-// import {CDNServer as Server} from './CDNServer/CDNServer';
-import { PersonalServer as Server } from './PersonalServer';
+// This is now the "correct" way to do this, we no longer call PersonalServer
+// -- CDNServer handles the CDN/Personal seperation via git sub-modules
+import { CDNServer as Server } from './CDNServer/CDNServer';
+// This allows other content servers to add additional features (such as Authentication,
+//    and gateways to custom/private services to the codebase, easily, without
+//    breaking the licence on the open source portions of the software - or bloating the
+//    base protocol.
 import { log } from './Logger';
 
 function concatTypedArrays(a: any, b: any): any { // a, b TypedArray of same type
