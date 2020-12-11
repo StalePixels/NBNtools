@@ -1,14 +1,14 @@
 import * as net from 'net'
 import { TextEncoder } from "util";
+import { log } from './Logger';
+// Differnt classess mean content servers can add additional features (such as Authentication,
+//    and gateways to custom/private services to the codebase, easily, without breaking
+//    the licence on the open source portions of the software - or bloating the base protocol.
+import { NBNServer as Server } from './PersonalServer/NBNServer';
 // This is now the "correct" way to do this, we no longer call Server types, but
 //    NBNServer handles the CDN/Personal seperation via different classes by
 //    wrapping a sibling class --  THIS IS PURELY FOR DEVOPS REASONS -- it means we
 //    can switch different server providers by swapping symlinks along!
-import { NBNServer as Server } from './PersonalServer/NBNServer';
-// Differnt classess mean content servers can add additional features (such as Authentication,
-//    and gateways to custom/private services to the codebase, easily, without breaking
-//    the licence on the open source portions of the software - or bloating the base protocol.
-import { log } from './Logger';
 
 function concatTypedArrays(a: any, b: any): any { // a, b TypedArray of same type
   const c = new (a.constructor)(a.length + b.length);
