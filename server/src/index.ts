@@ -2,7 +2,8 @@
 import * as fs from 'fs'
 import * as net from 'net'
 import * as path from 'path'
-import { env } from 'process'
+import 'process'
+
 import { log } from './lib/Logger';
 import { Session } from './lib/Session'
 
@@ -16,8 +17,8 @@ const defaultConfig = {
 };
 
 const getConfig = (paramName: string): any => {
-  if(env[`NBN_${paramName}`]) {
-    return env[`NBN_${paramName}`];
+  if(process.env[`NBN_${paramName}`]) {
+    return process.env[`NBN_${paramName}`];
   }
 
   return defaultConfig[paramName];
@@ -42,6 +43,16 @@ const config = {
   RETRY: getConfig("RETRY"),
   SHOWDOTS: getConfig("SHOWDOTS"),
 };
+
+// Log better about errors
+process
+    .on('unhandledRejection', (reason, p) => {
+        console.error(reason, 'Unhandled Rejection at Promise', p);
+    })
+    .on('uncaughtException', err => {
+        console.error(err, 'Uncaught Exception thrown');
+    });
+
 
 // 'connection' listener.
 const server  = net.createServer((socket) => {
