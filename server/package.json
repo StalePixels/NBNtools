@@ -9,7 +9,7 @@
   "license": "MIT",
   "keywords": [],
   "scripts": {
-    "start": "node build/main/index.js",
+    "start": "run-s clean && run-p build:* && node build/main/index.js",
     "nodemon": "nodemon --ext \"ts\" -w src --exec \"npm run-script build && npm run-script start\"",
     "servermon": "nodemon --ext \"js\" -w build --exec \"npm run-script start||exit 1\"",
     "describe": "npm-scripts-info",

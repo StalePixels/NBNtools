@@ -21,7 +21,7 @@ function concatTypedArrays(a, b) { // a, b TypedArray of same type
     return c;
 }
 
-export class PersonalServer {
+export class Server {
     protected block: number;
     protected blockData: Uint8Array;
     protected blockSize: number;
