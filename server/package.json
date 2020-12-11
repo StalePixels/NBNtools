@@ -11,6 +11,8 @@
   "scripts": {
     "start": "run-s clean && run-p build:* && node build/main/index.js",
     "nodemon": "nodemon --ext \"ts\" -w src --exec \"npm run-script build && npm run-script start\"",
+    "use-server-personal": "rm src/lib/PersonalServer && ln -s ../../../../nbn-ServiceServers/PersonalServer.public/ src/lib/PersonalServer",
+    "use-server-cdn": "rm src/lib/PersonalServer && ln -s ../../../../nbn-ServiceServers/CDNServer/ src/lib/PersonalServer",
     "servermon": "nodemon --ext \"js\" -w build --exec \"npm run-script start||exit 1\"",
     "describe": "npm-scripts-info",
     "build": "run-s clean && run-p build:*",
