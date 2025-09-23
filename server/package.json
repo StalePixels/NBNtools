@@ -55,7 +55,7 @@
     "node": ">=8.9"
   },
   "dependencies": {
-    "sha.js": "^2.4.11",
+    "sha.js": "^2.4.12",
     "workerpool": "^5.0.4"
   },
   "devDependencies": {
