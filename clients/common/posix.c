@@ -6,7 +6,6 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -19,11 +18,25 @@ void NBN_Fail(const unsigned char *message) {
     exit(1);
 }
 
-// $HOME/.nbn is the root of a pretend SD card: absolute Next paths go below it
-static const char *sd_path(char *buf, const char *path) {
+// $HOME/.nbn stands in for the Next's SD card
+static const char *card_dirs[] = { "", "/sys" };
+
+__attribute__((constructor)) static void card_setup(void) {
     const char *home = getenv("HOME");
     int error = errno;
-    char *slash;
+    char buf[PATH_MAX];
+    unsigned int i;
+
+    if (!home || !*home) return;
+    for (i = 0; i < sizeof card_dirs / sizeof card_dirs[0]; i++) {
+        if (snprintf(buf, PATH_MAX, "%s/.nbn%s", home, card_dirs[i]) >= PATH_MAX) break;
+        mkdir(buf, 0755);
+    }
+    errno = error;
+}
+
+static const char *sd_path(char *buf, const char *path) {
+    const char *home = getenv("HOME");
 
     if (path[0] != '/') return path;
     if (!home || !*home) {
@@ -34,12 +47,6 @@ static const char *sd_path(char *buf, const char *path) {
         errno = ENAMETOOLONG;
         return NULL;
     }
-    for (slash = buf + strlen(home) + 1; (slash = strchr(slash, '/')); slash++) {
-        *slash = 0;
-        if (mkdir(buf, 0755) && errno != EEXIST) return NULL;
-        *slash = '/';
-    }
-    errno = error;
     return buf;
 }
 
