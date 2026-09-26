@@ -10,7 +10,7 @@ const DEFAULT_CHECKSUM = 256;
 const DEFAULT_DIR_SIZE = 16;
 const PROTOCOL_VERSION = 2;
 
-const NBN_COMMAND_NEXT = "!".charCodeAt(0);
+const NBN_COMMAND_ACK = "!".charCodeAt(0);
 const NBN_COMMAND_BACK = "<".charCodeAt(0);
 
 function concatTypedArrays(a: Uint8Array, b: ArrayLike<number>): Uint8Array { // a, b TypedArray of same type
@@ -26,6 +26,15 @@ function isInsideRoot(root: string, absPath: string): boolean {
     return resolved === base || resolved.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
 }
 
+async function exists(absPath: string): Promise<boolean> {
+    try {
+        await fs.promises.access(absPath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export class Server {
     protected block!: number;
     protected blockData!: Uint8Array;
@@ -33,6 +42,7 @@ export class Server {
     protected checksum!: number;
     protected checksumBase: number;
     protected fileHandle?: number;
+    protected reading?: Promise<void>;
     protected currentWorkingDirectory: string;
     protected preferredBlockSize: number;
     protected preferredDirSize: number;
@@ -57,56 +67,80 @@ export class Server {
         log("COMMAND "+cmd+" WITH "+params);
         switch (cmd) {
             case "GET":
-                this.sendFile(params.join(' '));
+                this.holdFor(this.sendFile(params.join(' ')));
                 break;
             case "DIR":
-                this.sendDir(params);
+                this.holdFor(this.sendDir(params));
                 break;
             case "CD":
-                this.changeDir(params.join(' '));
+                this.holdFor(this.changeDir(params.join(' ')));
                 break;
             case "QUIT":
                 this.session.end("OK");
+                break;
+            case "!":
+                break;
+            case "<":
+                if (this.block > 0) {
+                    this.resendBlock();
+                }
                 break;
             default:
                 this.session.end("BadCommand_ERROR");
         }
     }
 
-    public data(buffer: Buffer): void {
+    // Old clients send "!1" as well as "!" for each block. Only the first "!1",
+    //    which acknowledges the header, counts; later ones repeat the "!".
+    public data(line: string): void {
+        if (line === "!1" && this.block > 0) {
+            return;
+        }
+        if (line.charCodeAt(0) === NBN_COMMAND_ACK) {
+            this.acknowledge();
+        } else if (line.charCodeAt(0) === NBN_COMMAND_BACK) {
+            this.resendBlock();
+        }
+    }
+
+    protected acknowledge(): void {
         switch(this.state) {
             case "S":     // SERVING file to NBNClient
-                if (buffer[0]  === NBN_COMMAND_NEXT) {
-                    this.block++;
-                    this.retries = 0;
-                    this.readFileBlock();
-                } else if (buffer[0]  === NBN_COMMAND_BACK) {
-                    if(this.retries<3) {
-                        this.retries++;
-                        this.sendBlock();
-                    } else {
-                        this.session.end("ExcessRetries_ERROR");
-                    }
-                }
+                this.block++;
+                this.retries = 0;
+                this.readFileBlock();
                 break;
             case "C":    // FILE COMPLETE
-                if(buffer[0] === NBN_COMMAND_NEXT) {
-                    this.closeFile();
-                    this.session.state = 'W';
-                } else if(buffer[0] === NBN_COMMAND_BACK) {
-                    this.retries++;
-                    this.sendBlock();
-                }
+                this.closeFile();
+                this.session.state = 'W';
                 break;
             default:
                 break;
         }
     }
 
-    protected sendDir(params: readonly string[] = []): void {
+    // The session handles its next line only after this work has finished.
+    protected holdFor(work: Promise<void>): void {
+        const release = this.session.hold();
+        work.catch((err: unknown) => {
+            log(err);
+            this.session.end("ServerException_ERROR");
+        }).finally(release);
+    }
+
+    protected resendBlock(): void {
+        if(this.retries<3) {
+            this.retries++;
+            this.sendBlock();
+        } else {
+            this.session.end("ExcessRetries_ERROR");
+        }
+    }
+
+    protected async sendDir(params: readonly string[] = []): Promise<void> {
         const absPath = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory)+path.sep;
 
-        if (!fs.existsSync(absPath)) {
+        if (!(await exists(absPath))) {
             this.session.end("BadFile_ERROR");
             return;
         }
@@ -119,102 +153,97 @@ export class Server {
         const relPath = absPath.replace(this.session.config.FILEPATH, '');
 
         log(this.session.config.FILEPATH.length, this.session.config.FILEPATH, absPath.length, absPath);
-        fs.readdir(absPath,  (err, files) => {
-            if (err) {
-                this.session.end("ServerException_ERROR");
-            } else {
-                // Part Zero, check the config, and see if we show hidden folders or not..
-                let dirList:  string[] = [];
-                if(absPath.length - this.session.config.FILEPATH.length > 1) {
-                    // cheap and cheerful subdir checking
-                    dirList[0] = "..";
+        const files = await fs.promises.readdir(absPath);
+        // Part Zero, check the config, and see if we show hidden folders or not..
+        let dirList:  string[] = [];
+        if(absPath.length - this.session.config.FILEPATH.length > 1) {
+            // cheap and cheerful subdir checking
+            dirList[0] = "..";
+        }
+        if(!this.session.config.SHOWDOTS) {
+            files.forEach((file) => {
+                if(!file.startsWith(".")) {
+                    dirList.push(file);
                 }
-                if(!this.session.config.SHOWDOTS) {
-                    files.forEach((file) => {
-                        if(!file.startsWith(".")) {
-                            dirList.push(file);
-                        }
-                    });
-                } else {
-                    dirList = dirList.concat(files);
-                }
+            });
+        } else {
+            dirList = dirList.concat(files);
+        }
 
-                // First, what page did they ask for
-                let dirPage = parseInt(params[0], 10);
-                if (!dirPage) {
-                    dirPage = 1;
-                }
-                const directoryOffset = (dirPage - 1) * this.preferredDirSize
-                const totalPages = Math.ceil(dirList.length / this.preferredDirSize );
-                const page = dirList.slice(directoryOffset, directoryOffset+this.preferredDirSize);
+        // First, what page did they ask for
+        let dirPage = parseInt(params[0], 10);
+        if (!dirPage) {
+            dirPage = 1;
+        }
+        const directoryOffset = (dirPage - 1) * this.preferredDirSize
+        const totalPages = Math.ceil(dirList.length / this.preferredDirSize );
+        const page = dirList.slice(directoryOffset, directoryOffset+this.preferredDirSize);
 
-                let listing: Uint8Array = new Uint8Array();
-                page.forEach( (entry) => {
-                    const fileStat = fs.statSync(absPath+entry);
-                    const filesize = fileStat.size;
-                    const filetype = fileStat.isDirectory() ? 0 : 1;
+        let listing: Uint8Array = new Uint8Array();
+        for (const entry of page) {
+            const fileStat = await fs.promises.stat(absPath+entry);
+            const filesize = fileStat.size;
+            const filetype = fileStat.isDirectory() ? 0 : 1;
 
-                    // Current File Size                Uint32
-                    listing = concatTypedArrays(listing, [(filesize) & 255,
-                        (filesize >> 8) & 255, (filesize >> 16) & 255, (filesize >> 24) & 255]);
+            // Current File Size                Uint32
+            listing = concatTypedArrays(listing, [(filesize) & 255,
+                (filesize >> 8) & 255, (filesize >> 16) & 255, (filesize >> 24) & 255]);
 
-                    // Current File Type                Uint8
-                    listing = concatTypedArrays(listing, [filetype]);
-                    const entryArray = new TextEncoder().encode(entry);
-                    listing = concatTypedArrays(listing, entryArray)
-                    listing = concatTypedArrays(listing, [0]);
-                });
+            // Current File Type                Uint8
+            listing = concatTypedArrays(listing, [filetype]);
+            const entryArray = new TextEncoder().encode(entry);
+            listing = concatTypedArrays(listing, entryArray)
+            listing = concatTypedArrays(listing, [0]);
+        }
 
-                let header: Uint8Array = new Uint8Array();
-                // VER                                  Uint8 (<=63)
-                header = concatTypedArrays(header, [PROTOCOL_VERSION]);
+        let header: Uint8Array = new Uint8Array();
+        // VER                                  Uint8 (<=63)
+        header = concatTypedArrays(header, [PROTOCOL_VERSION]);
 
-                // Path                                 NULL terminated string
-                header = concatTypedArrays(header, new TextEncoder().encode(relPath));
-                header = concatTypedArrays(header, [0]);
+        // Path                                 NULL terminated string
+        header = concatTypedArrays(header, new TextEncoder().encode(relPath));
+        header = concatTypedArrays(header, [0]);
 
-                // Total Entries in this dir            Uint16
-                header = concatTypedArrays(header, [(dirList.length) & 255, (dirList.length >> 8)]);
+        // Total Entries in this dir            Uint16
+        header = concatTypedArrays(header, [(dirList.length) & 255, (dirList.length >> 8)]);
 
-                // Current Page Number                  Uint16
-                header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8) & 255]);
+        // Current Page Number                  Uint16
+        header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8) & 255]);
 
-                // Current Page Size                    Uint8
-                header = concatTypedArrays(header, [page.length]);
+        // Current Page Size                    Uint8
+        header = concatTypedArrays(header, [page.length]);
 
-                // Total Pages in the dir               Uint16
-                header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
+        // Total Pages in the dir               Uint16
+        header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
 
-                // Size of NBNBlock                     Uint16
-                header = concatTypedArrays(header, [(listing.length) & 255, (listing.length >> 8)]);
+        // Size of NBNBlock                     Uint16
+        header = concatTypedArrays(header, [(listing.length) & 255, (listing.length >> 8)]);
 
-                // Send the DIRHEADER
-                this.session.socket.write(header);
+        // Send the DIRHEADER
+        this.session.socket.write(header);
 
-                // Send the filenames
+        // Send the filenames
 
-                this.session.socket.write(listing);
-                this.checksum = 0;
-                for (const letter of listing) {
-                    this.checksum = this.checksum + letter;
-                }
-                this.checksum = this.checksum % this.checksumBase;
-                this.session.socket.write(Uint8Array.from([this.checksum]));
-            }
-        });
+        this.session.socket.write(listing);
+        this.checksum = 0;
+        for (const letter of listing) {
+            this.checksum = this.checksum + letter;
+        }
+        this.checksum = this.checksum % this.checksumBase;
+        this.session.socket.write(Uint8Array.from([this.checksum]));
     }
 
-    protected changeDir(dir: string): void {
+    protected async changeDir(dir: string): Promise<void> {
         const absPath = path.resolve(dir.startsWith('/') ? (this.session.config.FILEPATH + dir) :
             ( this.session.config.FILEPATH + this.currentWorkingDirectory + path.sep + dir )
         ) + path.sep;
 
-        if (!fs.existsSync(absPath)) {
+        if (!(await exists(absPath))) {
             this.session.socket.write(Uint8Array.from([60, 13, 10]));
             return;
         }
 
-        if(!fs.statSync(absPath).isDirectory()) {
+        if(!(await fs.promises.stat(absPath)).isDirectory()) {
             this.session.socket.write(Uint8Array.from([60, 13, 10]));
             return;
         }
@@ -231,68 +260,69 @@ export class Server {
         this.currentWorkingDirectory = relPath;
 
         log(absPath, this.currentWorkingDirectory);
-        fs.readdir(absPath,  (err, files) => {
-            if (err) {
-                this.session.end("ServerException_ERROR");
-            } else {
+        const files = await fs.promises.readdir(absPath);
 
-                // Part Zero, check the config, and see if we show hidden folders or not..
-                let dirList:  string[] = [];
-                if(absPath.length - this.session.config.FILEPATH.length > 1) {
-                    // cheap and cheerful subdir checking
-                    dirList[0] = "..";
+        // Part Zero, check the config, and see if we show hidden folders or not..
+        let dirList:  string[] = [];
+        if(absPath.length - this.session.config.FILEPATH.length > 1) {
+            // cheap and cheerful subdir checking
+            dirList[0] = "..";
+        }
+        if(!this.session.config.SHOWDOTS) {
+            files.forEach((file) => {
+                if(!file.startsWith(".")) {
+                    dirList.push(file);
                 }
-                if(!this.session.config.SHOWDOTS) {
-                    files.forEach((file) => {
-                        if(!file.startsWith(".")) {
-                            dirList.push(file);
-                        }
-                    });
-                } else {
-                    dirList = dirList.concat(files);
-                }
+            });
+        } else {
+            dirList = dirList.concat(files);
+        }
 
-                // First, what page did they ask for
-                const dirPage = 1;
-                const directoryOffset = (dirPage - 1) * this.preferredDirSize
-                const totalPages = Math.ceil(files.length / this.preferredDirSize );
-                const page = files.slice(directoryOffset, directoryOffset+this.preferredDirSize);
+        // First, what page did they ask for
+        const dirPage = 1;
+        const directoryOffset = (dirPage - 1) * this.preferredDirSize
+        const totalPages = Math.ceil(files.length / this.preferredDirSize );
+        const page = files.slice(directoryOffset, directoryOffset+this.preferredDirSize);
 
-                let header: Uint8Array = new Uint8Array();
-                // VER                                  Uint8 (<=63)
-                header = concatTypedArrays(header, [PROTOCOL_VERSION]);
+        let header: Uint8Array = new Uint8Array();
+        // VER                                  Uint8 (<=63)
+        header = concatTypedArrays(header, [PROTOCOL_VERSION]);
 
-                // Path                                 NULL terminated string
-                header = concatTypedArrays(header, new TextEncoder().encode(this.currentWorkingDirectory));
-                header = concatTypedArrays(header, [0]);
+        // Path                                 NULL terminated string
+        header = concatTypedArrays(header, new TextEncoder().encode(this.currentWorkingDirectory));
+        header = concatTypedArrays(header, [0]);
 
-                // Total Entries in this dir            Uint16
-                header = concatTypedArrays(header, [(files.length) & 255, (files.length >> 8)]);
+        // Total Entries in this dir            Uint16
+        header = concatTypedArrays(header, [(files.length) & 255, (files.length >> 8)]);
 
-                // Current Page Number                  Uint16
-                header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8) & 255]);
+        // Current Page Number                  Uint16
+        header = concatTypedArrays(header, [(dirPage) & 255, (dirPage >> 8) & 255]);
 
-                // Current Page Size                    Uint8
-                header = concatTypedArrays(header, [page.length]);
+        // Current Page Size                    Uint8
+        header = concatTypedArrays(header, [page.length]);
 
-                // Total Pages in the dir               Uint16
-                header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
+        // Total Pages in the dir               Uint16
+        header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
 
-                // Send the DIRHEADER
-                this.session.socket.write(header);
+        // Send the DIRHEADER
+        this.session.socket.write(header);
 
-            }
+    }
+
+    // The handle is cleared at once so a second call does nothing; the close
+    //    itself waits for any read still using it.
+    public closeFile(): void {
+        const fd = this.fileHandle;
+        if (fd === undefined) {
+            return;
+        }
+        this.fileHandle = undefined;
+        void (this.reading ?? Promise.resolve()).then(() => {
+            fs.close(fd, () => undefined);
         });
     }
 
-    public closeFile(): void {
-        if (this.fileHandle !== undefined) {
-            fs.closeSync(this.fileHandle);
-            this.fileHandle = undefined;
-        }
-    }
-
-    protected sendFile(file: string): void {
+    protected async sendFile(file: string): Promise<void> {
         this.closeFile();
         this.block = 0;
         this.blockSize = this.preferredBlockSize;               // Variable blocksize, we shorten the last to fit
@@ -306,15 +336,15 @@ export class Server {
             return;
         }
 
-        if (!fs.existsSync(absFile) || fs.statSync(absFile).isDirectory()) {
+        const stats = await fs.promises.stat(absFile).catch(() => undefined);
+
+        if (stats === undefined || stats.isDirectory()) {
             this.session.socket.write("NoFile_ERROR");
             this.session.socket.write(Uint8Array.from([13, 10]));
             return;
         }
 
         log(`STATING ${absFile}" `);
-
-        const stats = fs.statSync(absFile);
 
         if (stats.size > MAX_FILE_SIZE) {
             this.session.socket.write("FileTooBig_ERROR");
@@ -340,11 +370,14 @@ export class Server {
         this.remainder = stats.size % this.preferredBlockSize;
         this.checksum = 0;
 
+        const release = this.session.hold();
         fs.open(absFile, 'r',  (err, fd) => {
             if (err) {
                 this.session.end("ServerException_ERROR");
+                release();
             } else if (this.session.socket.destroyed) {
-                fs.closeSync(fd);
+                fs.close(fd, () => undefined);
+                release();
             } else {
                 this.fileHandle = fd;
                 // Send the FILEHEADER
@@ -362,7 +395,7 @@ export class Server {
                 this.session.socket.write(filename);
 
                 // Terminating NULL    0x00
-                this.session.socket.write(Uint8Array.from([0]));
+                this.session.socket.write(Uint8Array.from([0]), () => release());
             }
         });
     }
@@ -377,23 +410,38 @@ export class Server {
             this.state = "C";       // We've now COMPLETED reading all the blocks
         }
 
-        fs.read(this.fileHandle!, this.blockData, 0, this.blockSize , null,  (err, bytesRead) => {
-            if (bytesRead < this.blockSize) {
+        const fd = this.fileHandle;
+        if (fd === undefined) {
+            this.session.end("ServerException_ERROR");
+            return;
+        }
+        const release = this.session.hold();
+        let readDone!: () => void;
+        this.reading = new Promise((resolve) => {
+            readDone = resolve;
+        });
+        fs.read(fd, this.blockData, 0, this.blockSize , null,  (err, bytesRead) => {
+            readDone();
+            if (this.fileHandle !== fd) {
+                release();
+            } else if (bytesRead < this.blockSize) {
                 this.session.end("ServerException_ERROR");
+                release();
             } else if (err) {
                 this.session.end("ServerException_ERROR");
+                release();
             } else {
                 for (let i = 0; i < this.blockSize; i++) {
                     this.checksum = this.checksum + this.blockData[i];
                 }
                 this.checksum = this.checksum % this.checksumBase;
-                this.sendBlock();
+                this.sendBlock(release);
             }
         });
     }
 
-    protected sendBlock(): void {
+    protected sendBlock(done?: () => void): void {
         this.session.socket.write(this.blockData.slice(0, this.blockSize));
-        this.session.socket.write(Uint8Array.from([this.checksum]));
+        this.session.socket.write(Uint8Array.from([this.checksum]), () => done?.());
     }
 }
