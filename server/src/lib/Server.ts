@@ -122,7 +122,7 @@ export class Server {
                     // cheap and cheerful subdir checking
                     dirList[0] = "..";
                 }
-                if(this.session.config.SHOWDOTS === false) {
+                if(!this.session.config.SHOWDOTS) {
                     files.forEach((file) => {
                         if(!file.startsWith(".")) {
                             dirList.push(file);
@@ -235,7 +235,7 @@ export class Server {
                     // cheap and cheerful subdir checking
                     dirList[0] = "..";
                 }
-                if(this.session.config.SHOWDOTS === false) {
+                if(!this.session.config.SHOWDOTS) {
                     files.forEach((file) => {
                         if(!file.startsWith(".")) {
                             dirList.push(file);
