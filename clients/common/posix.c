@@ -3,8 +3,11 @@
 //
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "platform.h"
@@ -16,8 +19,46 @@ void NBN_Fail(const unsigned char *message) {
     exit(1);
 }
 
+// $HOME/.nbn is the root of a pretend SD card: absolute Next paths go below it
+static const char *sd_path(char *buf, const char *path) {
+    const char *home = getenv("HOME");
+    int error = errno;
+    char *slash;
+
+    if (path[0] != '/') return path;
+    if (!home || !*home) {
+        errno = ENOENT;
+        return NULL;
+    }
+    if (snprintf(buf, PATH_MAX, "%s/.nbn%s", home, path) >= PATH_MAX) {
+        errno = ENAMETOOLONG;
+        return NULL;
+    }
+    for (slash = buf + strlen(home) + 1; (slash = strchr(slash, '/')); slash++) {
+        *slash = 0;
+        if (mkdir(buf, 0755) && errno != EEXIST) return NULL;
+        *slash = '/';
+    }
+    errno = error;
+    return buf;
+}
+
 uint8_t esxdos_f_open(const char *filename, int mode) {
+    char buf[PATH_MAX];
+
+    if (!(filename = sd_path(buf, filename))) return 0xFF;
     return (uint8_t)open(filename, mode, 0644);
+}
+
+int esxdos_f_read(uint8_t handle, void *dst, size_t nbytes) {
+    size_t done = 0;
+
+    while (done < nbytes) {
+        ssize_t got = read(handle, (uint8_t *)dst + done, nbytes - done);
+        if (got <= 0) break;
+        done += got;
+    }
+    return done;
 }
 
 uint16_t esxdos_f_write(uint8_t handle, void *src, uint16_t len) {
@@ -34,4 +75,26 @@ uint16_t esxdos_f_write(uint8_t handle, void *src, uint16_t len) {
 void esxdos_f_close(uint8_t handle) {
     // 0 is the "no file open" value in the clients, and on a host it is stdin
     if (handle) close(handle);
+}
+
+int esxdos_f_unlink(void *filename) {
+    char buf[PATH_MAX];
+    const char *path = sd_path(buf, filename);
+
+    if (!path) return -1;
+    return unlink(path);
+}
+
+// esxdos will not rename onto an existing file; POSIX rename() would replace it
+uint8_t esx_f_rename(const char *old, const char *new) {
+    char oldbuf[PATH_MAX], newbuf[PATH_MAX];
+    int error = errno;
+
+    if (!(old = sd_path(oldbuf, old)) || !(new = sd_path(newbuf, new))) return 0xFF;
+    if (access(new, F_OK) == 0) {
+        errno = EEXIST;
+        return 0xFF;
+    }
+    errno = error;
+    return rename(old, new) ? 0xFF : 0;
 }
