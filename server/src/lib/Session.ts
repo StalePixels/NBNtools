@@ -30,12 +30,17 @@ export class Session {
     this.server = new ServerType(this);
     this.state = "W";       // WAITING for command
 
-    log(ServerType);
+    log(ServerType.name);
 
     // Set up socket listeners
     socket.on("data", (buffer) => {
       // retain the scope of this class, and then call the data (incoming) method
       this.data(buffer);
+    });
+
+    socket.on("error", (err) => {
+      log(`Session error from ${socket.remoteAddress}:${socket.remotePort}: ${err.message}`);
+      socket.destroy();
     });
   }
 

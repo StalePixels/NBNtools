@@ -6,15 +6,6 @@ import { Session, type ServerClass } from './Session.js';
 export const startServer = (ServerType: ServerClass): net.Server => {
   const config = loadConfig();
 
-  // Log better about errors
-  process
-      .on('unhandledRejection', (reason, p) => {
-          console.error(reason, 'Unhandled Rejection at Promise', p);
-      })
-      .on('uncaughtException', err => {
-          console.error(err, 'Uncaught Exception thrown');
-      });
-
   // 'connection' listener.
   const server  = net.createServer((socket) => {
     log('Client connected');
