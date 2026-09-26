@@ -35,7 +35,8 @@ unsigned long uart_clock[] = { CLK_28_0, CLK_28_1, CLK_28_2, CLK_28_3, CLK_28_4,
 unsigned char old_cpu_speed;
 
 // Filehandle to for saving downloads
-unsigned char file_out;
+#define NO_FILE 0xFF
+unsigned char file_out = NO_FILE;
 
 // App state
 uint8_t uartVerbose = false;
@@ -57,7 +58,7 @@ uint8_t commandLen;
 // UI Line buffer
 static void shutdown() {
     NET_Close();
-    esxdos_f_close(file_out);
+    if(file_out != NO_FILE) esxdos_f_close(file_out);
     NBN_Free();
 
     zx_border(7);
@@ -405,6 +406,7 @@ reparse:
         if (errno)
         {
             printf("Could not create:\n %s\n", nbnBuff);
+            file_out = NO_FILE;
 
             exit(errno);
         }
@@ -463,6 +465,8 @@ reparse:
         else {
             if(!motd) {
                 NBN_WriteBlock(file_out, remainder);
+                esxdos_f_close(file_out);
+                file_out = NO_FILE;
                 printf("\x16%c%cFile transfer complete! ", 3, 8);
             }
             NET_PutCh(NBN_BLOCK_SUCCESS);
