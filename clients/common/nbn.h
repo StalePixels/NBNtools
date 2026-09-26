@@ -60,11 +60,11 @@ extern unsigned char nbnBuff[260];
 
 // Public Protocolly bits
 
-bool NBN_CheckVersionByte(bool fatal);
-unsigned char NBN_ChangeDirectory(char *dir);
-void NBN_ParseDirectoryHeader(nbnDirectory_t *dir);
-void NBN_StatDirectory(nbnDirectory_t *dir);
-void NBN_GetDirectory(nbnDirectory_t *dir);
+bool NBN_CheckVersionByte(bool fatal) __z88dk_fastcall;
+unsigned char NBN_ChangeDirectory(char *dir) __z88dk_fastcall;
+void NBN_ParseDirectoryHeader(nbnDirectory_t *dir) __z88dk_fastcall;
+void NBN_StatDirectory(nbnDirectory_t *dir) __z88dk_fastcall;
+void NBN_GetDirectory(nbnDirectory_t *dir) __z88dk_fastcall;
 
 // MemManager for the RAM we page over the ULA
 bool NBN_Malloc();
@@ -72,7 +72,7 @@ void NBN_Free();
 unsigned char NBN_GetStatus();
 
 // THIS DOES ULA MEMORY PAGING, DO NOT RUN WITH INTERRUPTS ENABLED - JUST IN CASE!
-bool NBN_GetBlock(uint16_t blockSize);
+bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall;
 bool NBN_WriteBlock(uint8_t fileHandle, uint16_t blockSize);
 
 
