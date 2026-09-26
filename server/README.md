@@ -57,6 +57,7 @@ Rules:
 - A handler never writes to the socket. The session writes the answer, and the next line waits until it is written.
 - To end the session, return `closeWith(text)`. It sends the text and `\r\n`, then closes.
 - An error that keeps the session open, such as `NoFile_ERROR`, is an ordinary answer.
+- An error text starts with a letter. The client reads a first byte below 64, such as a digit, as a protocol version, and then does not show the error.
 - `throw` is for unexpected errors only. The session logs the error and ends with `ServerException_ERROR`.
 - Use asynchronous file calls (`fs.promises`). A synchronous call stops every session on the server.
 

@@ -22,11 +22,11 @@ _err_timeout_byte:
 _err_failed_connection:
    defm "Failed to connec", 't' + 0x80
 _err_wrong_version:
-   defm "Wrong protocol verso", 'n' + 0x80
+   defm "Wrong protocol versio", 'n' + 0x80
 _err_nbn_protocol:
    defm "NBN protocol erro", 'r' + 0x80
 _err_bad_port:
-   defm "Invalid port number", 'r' + 0x80
+   defm "Invalid port numbe", 'r' + 0x80
 _err_missing_filename:
    defm "F Missing file nam", 'e' + 0x80
 _err_bad_server:
