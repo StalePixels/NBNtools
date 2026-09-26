@@ -198,9 +198,9 @@ export class Server {
     }
 
     protected changeDir(dir: string): void {
-        const absPath = path.resolve(dir.startsWith('/') ? (this.session.config.FILEPATH + dir + path.sep) :
-            ( this.session.config.FILEPATH + this.currentWorkingDirectory + path.sep + dir + path.sep )
-        );
+        const absPath = path.resolve(dir.startsWith('/') ? (this.session.config.FILEPATH + dir) :
+            ( this.session.config.FILEPATH + this.currentWorkingDirectory + path.sep + dir )
+        ) + path.sep;
 
         if (!fs.existsSync(absPath)) {
             this.session.socket.write(Uint8Array.from([60, 13, 10]));
