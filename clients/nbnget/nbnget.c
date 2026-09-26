@@ -384,18 +384,17 @@ begin_transfer:
 
         // Send "Get next block" command
         NET_PutCh(NBN_BLOCK_SUCCESS);
-        NET_Send("1\x0D\x0A", 3);
+        NET_Send("\x0D\x0A", 2);
 
     receive_next_block:
         progress_block_waiting();
         if(!NBN_GetBlock(NBN_MAX_BLOCKSIZE)) {
             progress_block_retry(retries);
 
-            blocks++;
             retries--;
             if(!retries)  NBN_Fail(err_transfer_error);
 
-            UART_PutCh(NBN_BLOCK_FAIL);
+            NET_PutCh(NBN_BLOCK_FAIL);
             NET_Send("\x0D\x0A", 2);
             goto receive_next_block;
         }
@@ -403,9 +402,6 @@ begin_transfer:
             NBN_WriteBlock(file_out, NBN_MAX_BLOCKSIZE);
             progress_block_done();
             retries = 3;
-            // Get data
-            NET_PutCh(NBN_BLOCK_SUCCESS);
-            NET_Send("\x0D\x0A", 2);
         }
     }
     NET_Send("!", 1);
@@ -420,17 +416,18 @@ receive_last_block:
     if(!NBN_GetBlock(remainder)) {
         progress_block_retry(retries);
 
-        blocks++;
         retries--;
         if(!retries)  NBN_Fail(err_transfer_error);
 
-        UART_PutCh(NBN_BLOCK_FAIL);
+        NET_PutCh(NBN_BLOCK_FAIL);
         NET_Send("\x0D\x0A", 2);
         goto receive_last_block;
     }
     else {
         NBN_WriteBlock(file_out, remainder);
         progress_block_done();
+        NET_PutCh(NBN_BLOCK_SUCCESS);
+        NET_Send("\x0D\x0A", 2);
     }
 
 #ifndef __ZXNEXT

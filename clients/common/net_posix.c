@@ -4,8 +4,7 @@
 //
 // Writes are held in a buffer and sent in one write() just before the next
 // read. The server reads each TCP chunk as one command or ack, and on the
-// Next the ESP8266 groups the bytes the same way (for example, "!\r\n" and
-// "!1\r\n" after a block arrive as one chunk).
+// Next the ESP8266 groups the bytes the same way.
 //
 
 #include <netdb.h>

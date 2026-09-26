@@ -422,26 +422,22 @@ reparse:
 
             // Send "Get next block" command
             NET_PutCh(NBN_BLOCK_SUCCESS);
-            NET_Send("1\x0D\x0A", 3);
+            NET_Send("\x0D\x0A", 2);
 
             receive_next_block:
             if(!NBN_GetBlock(NBN_MAX_BLOCKSIZE)) {
                 printf("\x16%c%c   Retry(%d)part: %lu ", 3, 8, retries, blocks);
 
-                blocks++;
                 retries--;
                 if(!retries)  exit((int)err_transfer_error);
 
-                UART_PutCh(NBN_BLOCK_FAIL);
+                NET_PutCh(NBN_BLOCK_FAIL);
                 NET_Send("\x0D\x0A", 2);
                 goto receive_next_block;
             }
             else {
                 if(!motd) NBN_WriteBlock(file_out, NBN_MAX_BLOCKSIZE);
                 retries = 3;
-                // Get data
-                NET_PutCh(NBN_BLOCK_SUCCESS);
-                NET_Send("\x0D\x0A", 2);
             }
         }
         NET_Send("!", 1);
@@ -454,11 +450,10 @@ reparse:
         if(!NBN_GetBlock(remainder)) {
             printf("\x16%c%c Retry(%d) bytes: %d ", 3, 8, retries, remainder);
 
-            blocks++;
             retries--;
             if(!retries)  exit((int)err_transfer_error);
 
-            UART_PutCh(NBN_BLOCK_FAIL);
+            NET_PutCh(NBN_BLOCK_FAIL);
             NET_Send("\x0D\x0A", 2);
             goto receive_last_block;
         }
