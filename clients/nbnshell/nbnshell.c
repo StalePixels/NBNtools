@@ -155,6 +155,43 @@ void wipeWorkspace() {
     }
 }
 
+#define MOTD_TOP        4
+#define MOTD_BOTTOM     20
+#define MOTD_WIDTH      62
+unsigned char motdLine[MOTD_WIDTH + 1];
+// The screen is paged out while nbnBlock is paged in, so each byte is read with its own page switch.
+void shellShowMotd(uint16_t motdSize) {
+    uint8_t row = MOTD_TOP;
+    uint8_t len = 0;
+    unsigned char c;
+
+    for (uint16_t pos = 0; pos <= motdSize; pos++) {
+        if (pos < motdSize) {
+            NBN_PageIn();
+            c = nbnBlock[pos];
+            NBN_PageOut();
+        }
+        else {
+            if (!len) break;
+            c = '\n';
+        }
+
+        if (c == '\t') c = ' ';
+        if (c > 31 && c < 127) motdLine[len++] = c;
+        if (c != '\n' && len < MOTD_WIDTH) continue;
+
+        motdLine[len] = 0;
+        if (row > MOTD_BOTTOM) {
+            printAtStr(21, 1, "-- MORE --");
+            get_key();
+            wipeWorkspace();
+            row = MOTD_TOP;
+        }
+        printAtStr(row, 1, motdLine);
+        row++;
+        len = 0;
+    }
+}
 
 #define SHELL_MODE_COMMAND  0
 #define SHELL_MODE_DIR      1
@@ -342,8 +379,11 @@ reparse:
         sprintf(commandBuffer, "GET %s\x0A\x0D", arg);
         NET_Send(commandBuffer, strlen(commandBuffer));
 
+        handle_transer:
+
         bool OK = NBN_CheckVersionByte(false);
         if(!OK) return;
+        bool motd = !stricmp(command, "MOTD");
         NET_GetUInt32(&size);
         NET_GetUInt32(&blocks);
         NET_GetUInt16(&remainder);
@@ -357,6 +397,7 @@ reparse:
         goto append_filename;
 
         begin_transfer:
+        if(motd) goto receive_blocks;
         errno = 0;
         // Open Write Output
         file_out = esxdos_f_open(nbnBuff, ESXDOS_MODE_W | ESXDOS_MODE_CT);
@@ -370,11 +411,12 @@ reparse:
         printf("\x16%c%cName: %-54.54s", 3, 4, nbnBuff);
         printf("\x16%c%cSize: %-8lu bytes", 3, 6, size);
 
+        receive_blocks:
         // FOR BLOCKS
         uint8_t retries = 3;
 
         for(;blocks>0;blocks--) {
-            printf("\x16%c%cParts Remaining: %lu ", 3, 8, blocks);
+            if(!motd) printf("\x16%c%cParts Remaining: %lu ", 3, 8, blocks);
 
             // Send "Get next block" command
             NET_PutCh(NBN_BLOCK_SUCCESS);
@@ -393,7 +435,7 @@ reparse:
                 goto receive_next_block;
             }
             else {
-                NBN_WriteBlock(file_out, NBN_MAX_BLOCKSIZE);
+                if(!motd) NBN_WriteBlock(file_out, NBN_MAX_BLOCKSIZE);
                 retries = 3;
                 // Get data
                 NET_PutCh(NBN_BLOCK_SUCCESS);
@@ -406,7 +448,7 @@ reparse:
         retries = 3;
 
         receive_last_block:
-        printf("\x16%c%cBytes Remaining: %d ", 3, 8, remainder);
+        if(!motd) printf("\x16%c%cBytes Remaining: %d ", 3, 8, remainder);
         if(!NBN_GetBlock(remainder)) {
             printf("\x16%c%c Retry(%d) bytes: %d ", 3, 8, retries, remainder);
 
@@ -419,16 +461,25 @@ reparse:
             goto receive_last_block;
         }
         else {
-            NBN_WriteBlock(file_out, remainder);
-            printf("\x16%c%cFile transfer complete! ", 3, 8);
+            if(!motd) {
+                NBN_WriteBlock(file_out, remainder);
+                printf("\x16%c%cFile transfer complete! ", 3, 8);
+            }
             NET_PutCh(NBN_BLOCK_SUCCESS);
             NET_Send("\x0D\x0A", 2);
         }
+
+        if(motd) shellShowMotd((uint16_t)size);
 
         strcpy(commandBuffer, "COMPLETE!");
         shellPrintStatus();
 
         return;
+    } else if(!stricmp(command, "MOTD")) {
+
+        NET_Send("MOTD\x0A\x0D", 6);
+
+        goto handle_transer;
     }
 }
 
