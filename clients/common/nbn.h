@@ -22,14 +22,20 @@
 #define NBN_GetUInt16                   UART_GetUInt16
 #define NBN_GetUInt32                   UART_GetUInt32
 
+#ifdef NBN_POSIX
+#define NBN_PageIn()
+#define NBN_PageOut()
+#else
 #define NBN_PageIn()        ZXN_WRITE_MMU2(nbnBottom8KPage); \
                             ZXN_WRITE_MMU3(nbnTop8KPage)
 
 #define NBN_PageOut()       ZXN_WRITE_MMU2(ULA_BOTTOM_PAGE); \
                             ZXN_WRITE_MMU3(ULA_TOP_PAGE)
+#endif
 #include <stdlib.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "platform.h"
 
 // App state
 typedef struct {

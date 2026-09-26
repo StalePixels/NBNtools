@@ -13,4 +13,11 @@ extern unsigned char err_file_not_found[];
 extern unsigned char err_bad_port[];
 extern unsigned char err_bad_server[];
 
+// Exit with one of the errors above
+#ifdef NBN_POSIX
+void NBN_Fail(const unsigned char *message) __attribute__((noreturn));
+#else
+#define NBN_Fail(message)       exit((int)(message))
+#endif
+
 #endif

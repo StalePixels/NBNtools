@@ -7,6 +7,8 @@
 #ifndef NBNTOOLS_UTIL_H
 #define NBNTOOLS_UTIL_H
 
+#include "platform.h"
+
 void looper(uint32_t delay) __z88dk_fastcall;
 
 #endif //NBNTOOLS_UTIL_H

@@ -8,6 +8,7 @@ options:
  -p xxxx Alternative Port
  -r      Reset WiFi connection
  -v      Verbose AT protocol log
+ -q      Quiet, no progress bar
 
 * WARNING
  -s changes remote file-source,

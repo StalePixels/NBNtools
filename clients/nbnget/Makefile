@@ -44,6 +44,12 @@ ZIP := zip -r -v
 
 DEBUGFLAGS := --list --c-code-in-asm
 
+POSIX_DIR ?= ./BUILD-posix
+POSIX_CC ?= cc
+POSIX_CFLAGS ?= -DNBN_POSIX -O2 -Wall -Wno-pointer-sign
+POSIX_SRC := nbnget.c ../common/nbn.c ../common/net_posix.c ../common/posix.c
+POSIX_GEN := $(POSIX_DIR)/messages.c $(POSIX_DIR)/help.c
+
 all: binaries
 
 clean:
@@ -52,6 +58,7 @@ clean:
 	$(RM) $(NAME)_CODE.bin
 	$(RM) $(NAME)_MAIN.bin
 	$(RM) $(NAME)_UNASSIGNED.bin
+	$(RM) $(POSIX_DIR)
 
 dirs:
 	$(MKDIR) $(BUILD_DIR)
@@ -61,6 +68,22 @@ dotn:
 	$(MV) $(NAME) $(BUILD_DIR)/$(NAME)
 
 binaries: dirs dotn
+
+posix: $(POSIX_DIR)/$(NAME)
+
+$(POSIX_DIR)/$(NAME): $(POSIX_SRC) $(POSIX_GEN) ../common/*.h help.h
+	$(POSIX_CC) $(POSIX_CFLAGS) -o $@ $(POSIX_SRC) $(POSIX_GEN)
+
+$(POSIX_DIR)/messages.c: ../common/messages.asm ../common/messages2c.awk
+	$(MKDIR) $(POSIX_DIR)
+	awk -f ../common/messages2c.awk ../common/messages.asm > $@
+
+# The same files help.asm includes with BINARY
+$(POSIX_DIR)/help.c: help.txt ../../VERSION CREDITS
+	$(MKDIR) $(POSIX_DIR)
+	( for f in help:help.txt version:../../VERSION credits:CREDITS; do \
+		echo "unsigned char $${f%%:*}[] = {"; xxd -i < $${f#*:}; echo ", 0 };"; \
+	done ) > $@
 
 install:
 	$(CP) $(BUILD_DIR)/$(NAME) $(INSTALL_DRIVE)/dot

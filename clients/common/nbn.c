@@ -2,8 +2,10 @@
 // Created by D Rimron-Soutter on 31/03/2020.
 //
 
+#ifndef NBN_POSIX
 #include <arch/zxn.h>
 #include <arch/zxn/esxdos.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -14,8 +16,21 @@
 #include "net.h"
 
 uint8_t nbnBottom8KPage = 0, nbnTop8KPage = 0;
-unsigned char *nbnBlock = 0x4000;
 unsigned char nbnBuff[260];
+
+#ifdef NBN_POSIX
+// The same size as the two 8K pages the Next build uses
+static unsigned char nbnBlockMemory[16384];
+unsigned char *nbnBlock = nbnBlockMemory;
+
+bool NBN_Malloc() {
+    return true;
+}
+
+void NBN_Free() {
+}
+#else
+unsigned char *nbnBlock = 0x4000;
 
 bool NBN_Malloc() {
     nbnBottom8KPage = esx_ide_bank_alloc(0);
@@ -30,6 +45,7 @@ void NBN_Free() {
     if(nbnBottom8KPage) esx_ide_bank_free(0, nbnBottom8KPage);
     if(nbnTop8KPage)    esx_ide_bank_free(0, nbnTop8KPage);
 }
+#endif
 
 unsigned char NBN_GetStatus() {
     unsigned char status[4];
@@ -43,7 +59,7 @@ unsigned char NBN_GetStatus() {
     } else {
         printf("%s", status);
         UART_WaitOK(true);
-        exit((int)err_nbn_protocol);
+        NBN_Fail(err_nbn_protocol);
     }
 }
 
@@ -81,14 +97,14 @@ bool NBN_CheckVersionByte(bool fatal) __z88dk_fastcall {
             printf("\n Server Said: %c", errno);
             NET_WaitOK(true);
             if(fatal) {
-                exit((int) err_nbn_protocol);
+                NBN_Fail(err_nbn_protocol);
             }
             else {
                 pass = false;
             }
         }
         if(fatal) {
-            exit((int) err_wrong_version);
+            NBN_Fail(err_wrong_version);
         }
         else {
             pass = false;
@@ -110,10 +126,10 @@ void NBN_ParseDirectoryHeader(nbnDirectory_t *dir)  __z88dk_fastcall  {
     }
     // now add the NULL
     dir->currentPath[dirLen] = chr;
-    NET_GetUInt16(&(dir->totalEntries));
-    NET_GetUInt16(&(dir->currentPage));
+    NET_GetUInt16((uint8_t *)&(dir->totalEntries));
+    NET_GetUInt16((uint8_t *)&(dir->currentPage));
     dir->currentPageSize = NET_GetUChar();
-    NET_GetUInt16(&(dir->totalPages));
+    NET_GetUInt16((uint8_t *)&(dir->totalPages));
 }
 
 unsigned char NBN_ChangeDirectory(char *dir) __z88dk_fastcall {
@@ -137,10 +153,10 @@ void NBN_GetDirectory(nbnDirectory_t *dir)  __z88dk_fastcall  {
     // Get the DIRHEADER
     NBN_ParseDirectoryHeader(dir);
     uint16_t nbnBlockSize;
-    NET_GetUInt16(&nbnBlockSize);
+    NET_GetUInt16((uint8_t *)&nbnBlockSize);
 
     if(!NBN_GetBlock(nbnBlockSize))
-        exit((int)err_transfer_error);
+        NBN_Fail(err_transfer_error);
 }
 
 bool NBN_WriteBlock(uint8_t fileHandle, uint16_t blockSize) {

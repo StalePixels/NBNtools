@@ -8,8 +8,12 @@
 #ifndef NBNTOOLS_UART_H
 #define NBNTOOLS_UART_H
 
+#include "platform.h"
+
+#ifndef NBN_POSIX
 __sfr __banked __at 0x153b IO_153B;
 __sfr __banked __at 0x153b IO_UART_CONTROL;
+#endif
 
 #define DEFAULT_TIMEOUT         131071UL
 

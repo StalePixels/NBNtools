@@ -1,3 +1,6 @@
+#ifdef NBN_POSIX
+#include <inttypes.h>
+#else
 #pragma printf = "%ld %lu %d %s %c %u %x"
 #pragma output CLIB_EXIT_STACK_SIZE = 1
 
@@ -5,10 +8,11 @@
 #include <arch/zxn.h>
 #include <intrinsic.h>
 #include <arch/zxn/esxdos.h>
+#include <input.h>
+#endif
 
 #include <ctype.h>
 #include <errno.h>
-#include <input.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -21,10 +25,12 @@
 #include "../common/uart.h"
 #include "../common/net.h"
 #include "../common/nbn.h"
+#ifndef NBN_POSIX
 #include "../common/ula.h"
 #include "../common/spui_lite.h"
 
 unsigned int prescalar;
+#endif
 
 // File Header
 static uint32_t blocks = 0;
@@ -39,9 +45,11 @@ static uint16_t checksum;
 // for loops
 uint32_t counter;
 
+#ifndef NBN_POSIX
 // Machine State
 static unsigned long uart_clock[] = { CLK_28_0, CLK_28_1, CLK_28_2, CLK_28_3, CLK_28_4, CLK_28_5, CLK_28_6, CLK_28_7 };
 static unsigned char old_cpu_speed;
+#endif
 
 // Filehandle to for saving downloads
 unsigned char file_out;
@@ -54,11 +62,19 @@ static unsigned char defaultServer[] = "cdn.nextbestnetwork.com";
 static unsigned char defaultPort[] = "48128";
 static uint8_t customServer = 0;
 static uint8_t customPort = 0;
-static uint8_t fileArg = 1;
+static uint8_t fileArg = 0;
 static bool verbose = 0;
 static bool resetWifi = false;
+static bool quiet = false;
 
-// App state
+// Progress bar
+#define PROGRESS_WIDTH 20.0f
+
+static uint8_t progress_style = 0; // slow
+static uint16_t progress_parts;
+static uint16_t progress_part = 1;
+static uint16_t progress = 0;
+static char progressChar = ' ';
 
 
 
@@ -67,19 +83,82 @@ static void shutdown() {
     esxdos_f_close(file_out);
     NBN_Free();
 
+#ifndef NBN_POSIX
     zx_border(7);
     ZXN_NEXTREGA(REG_TURBO_MODE, old_cpu_speed);
+#endif
 }
 
-static void help_and_exit(int exit_value) __z88dk_fastcall {
+static void help_and_exit(unsigned char *error) __z88dk_fastcall {
     printf("%s",help);
     printf("\nv%s by %s",version, credits);
 
+#ifndef NBN_POSIX
     ZXN_NEXTREGA(REG_TURBO_MODE, old_cpu_speed);
-    exit(exit_value);
+#endif
+    if(error) NBN_Fail(error);
+    exit(0);
+}
+
+// Colours for the next progress bar cell
+static void progress_block_start(void) {
+#ifndef NBN_POSIX
+    if(quiet) return;
+    printInk(INK_BLACK);
+    printPaper(INK_YELLOW);
+    printFlashOn();
+#endif
+}
+
+// Show the cell for the block now in transfer
+static void progress_block_waiting(void) {
+#ifndef NBN_POSIX
+    if(quiet) return;
+    printf("%c", progressChar);
+#endif
+}
+
+static void progress_block_retry(uint8_t retries) {
+#ifdef NBN_POSIX
+    fprintf(stderr, "Block checksum failed, %d tries left\n", retries - 1);
+#else
+    if(quiet) return;
+    printf("\x1C");  // move cursor back one
+    progressChar = '0' + retries;
+    printPaper(INK_YELLOW);
+    printInk(INK_RED);
+#endif
+}
+
+static void progress_block_done(void) {
+    if(quiet) return;
+#ifndef NBN_POSIX
+    printPaper(INK_GREEN);
+    printFlashOff();
+    printf("\x1C");  // move cursor back one
+    if (progress_style) {
+        for (uint8_t iter8 = progress_part; iter8 > 0; --iter8) {
+            printf("%c", progressChar);
+        }
+        progressChar = ' ';
+        return;
+    }
+#endif
+    progress++;
+    if (progress >= progress_parts * (progress_part / PROGRESS_WIDTH)) {
+        ++progress_part;
+#ifdef NBN_POSIX
+        putchar('#');
+        fflush(stdout);
+#else
+        printf("%c", progressChar);
+#endif
+    }
+    progressChar = ' ';
 }
 
 int main(int argc, char** argv) {
+#ifndef NBN_POSIX
     // We need to restore this on exit...
     old_cpu_speed = ZXN_READ_REG(REG_TURBO_MODE);
 
@@ -87,14 +166,15 @@ int main(int argc, char** argv) {
     ZXN_NEXTREG(REG_TURBO_MODE, 3);
 
     zx_cls(PAPER_WHITE);
+#endif
 
     counter = 0;
     // Let's check some options out
-    while(counter<argc) {
+    while(counter+1<argc) {
         counter=counter+1;
         if (stricmp(argv[counter], "-h") == 0) {
             // Dump the help file
-            help_and_exit(0);
+            help_and_exit(NULL);
         } else
 
         if (stricmp(argv[counter], "-v") == 0) {
@@ -103,7 +183,7 @@ int main(int argc, char** argv) {
                 UART_SetVerbose(true);
             } else {
                 // Error
-                help_and_exit((int)err_missing_filename);
+                help_and_exit(err_missing_filename);
             }
         } else
 
@@ -111,7 +191,7 @@ int main(int argc, char** argv) {
             // make sure I'm not the last param...  (this needs deduping!)
             if(counter+2>argc) {
                 // Error
-                help_and_exit((int)err_bad_server);
+                help_and_exit(err_bad_server);
             }
             counter++;
 
@@ -122,7 +202,7 @@ int main(int argc, char** argv) {
             // make sure I'm not the last param...  (this needs deduping!)
             if(counter+2>argc) {
                 // Error
-                help_and_exit((int)err_bad_port);
+                help_and_exit(err_bad_port);
             }
             counter++;
 
@@ -133,15 +213,19 @@ int main(int argc, char** argv) {
             // make sure I'm not the last param...  (this needs deduping!)
             if(counter+2>argc) {
                 // Error
-                help_and_exit((int)err_missing_filename);
+                help_and_exit(err_missing_filename);
             }
 
             resetWifi = true;
         } else
 
+        if (stricmp(argv[counter], "-q") == 0) {
+            quiet = true;
+        } else
+
         if (argv[counter][0]=='-') {
             // Error
-            help_and_exit((int)err_missing_filename);
+            help_and_exit(err_missing_filename);
         } else
 
         if (counter+1 == argc) {
@@ -150,13 +234,18 @@ int main(int argc, char** argv) {
             break;
         } else {
             // Error
-            help_and_exit((int)err_missing_filename);
+            help_and_exit(err_missing_filename);
         }
+    }
+
+    if(!fileArg) {
+        help_and_exit(err_missing_filename);
     }
 
     // Register a default shutown routine, to restore the settings we changed, and handle network, etc...
     atexit(shutdown);
 
+#ifndef NBN_POSIX
     // Work out our real speed, based on video timing, and set the UART accordingly (move to common/uart later)
     IO_NEXTREG_REG = REG_VIDEO_TIMING;
     prescalar = uart_clock[IO_NEXTREG_DAT] / 115200UL;
@@ -172,18 +261,22 @@ int main(int argc, char** argv) {
         printf("Closing Existing connections...\n");
         NET_Close();
     }
+#endif
 
     printf("Opening: NextBestNetwork\n");
 
-    NET_Connect((customServer ? argv[customServer] : defaultServer), (customPort ? argv[customPort] : defaultPort));
+    NET_Connect((customServer ? argv[customServer] : (char *)defaultServer), (customPort ? argv[customPort] : (char *)defaultPort));
 
+#ifndef NBN_POSIX
     errno = UART_WaitOK(false);
 
     if(errno) {
-        exit((int)err_failed_connection);
+        NBN_Fail(err_failed_connection);
     }
+#endif
     printf("\nConnected!\n");
 
+#ifndef NBN_POSIX
     NET_ModeSingle();
 
     NET_OpenSocket();
@@ -194,23 +287,23 @@ int main(int argc, char** argv) {
         unsigned char okflag = NET_GetUChar();
 
         if (okflag == '>') {
-            goto get_file;
+            break;
         }
 
-        if (errno=0) {
-            exit((int)err_failed_connection);
+        if (errno==0) {
+            NBN_Fail(err_failed_connection);
         }
     }
+#endif
 
-get_file:
     NET_Send("GET ",4);
     NET_Send(argv[fileArg], strlen(argv[fileArg]));
     NET_Send("\x0A", 1);
 
     NBN_CheckVersionByte(true);
-    NET_GetUInt32(&size);
-    NET_GetUInt32(&blocks);
-    NET_GetUInt16(&remainder);
+    NET_GetUInt32((uint8_t *)&size);
+    NET_GetUInt32((uint8_t *)&blocks);
+    NET_GetUInt16((uint8_t *)&remainder);
 
     // reset index for string len mgmt
     counter = 0;
@@ -239,6 +332,9 @@ begin_transfer:
         exit(errno);
     }
 
+#ifdef NBN_POSIX
+    printf("Name: %s\nSize: %" PRIu32 " bytes\n", filename, size);
+#else
     zx_cls(PAPER_WHITE);
 
     printInk(INK_WHITE);
@@ -270,6 +366,7 @@ begin_transfer:
 
 
     printAt(13, 7);
+#endif
 
     UART_SetVerbose(false);     // else is breaks the progress meter
 
@@ -277,37 +374,26 @@ begin_transfer:
     // FOR BLOCKS
     uint8_t retries = 3;
 
-    uint8_t progress_style = 0; // slow
     uint8_t progress_block_size;
-    uint16_t progress_parts = blocks + 1;
-    uint16_t progress_part = 1;
-    uint16_t progress = 0;
-    char progressChar = ' ';
-
-#define PROGRESS_WIDTH 20.0f
+    progress_parts = blocks + 1;
 
     float block_progress_percent = blocks / PROGRESS_WIDTH;
 
     for(;blocks>0;blocks--) {
-        printInk(INK_BLACK);
-        printPaper(INK_YELLOW);
-        printFlashOn();
+        progress_block_start();
 
         // Send "Get next block" command
         NET_PutCh(NBN_BLOCK_SUCCESS);
         NET_Send("1\x0D\x0A", 3);
 
     receive_next_block:
-        printf("%c", progressChar);
+        progress_block_waiting();
         if(!NBN_GetBlock(NBN_MAX_BLOCKSIZE)) {
-            printf("\x1C");  // move cursor back one
-            sprintf(&progressChar, "%d", retries);
-            printPaper(INK_YELLOW);
-            printInk(INK_RED);
+            progress_block_retry(retries);
 
             blocks++;
             retries--;
-            if(!retries)  exit((int)err_transfer_error);
+            if(!retries)  NBN_Fail(err_transfer_error);
 
             UART_PutCh(NBN_BLOCK_FAIL);
             NET_Send("\x0D\x0A", 2);
@@ -315,22 +401,7 @@ begin_transfer:
         }
         else {
             NBN_WriteBlock(file_out, NBN_MAX_BLOCKSIZE);
-
-            printPaper(INK_GREEN);
-            printFlashOff();
-            printf("\x1C");  // move cursor back one
-            if (progress_style) {
-                for (uint8_t iter8 = progress_part; iter8 > 0; --iter8) {
-                    printf("%c", progressChar);
-                }
-            } else {
-                progress++;
-                if (progress >= progress_parts * (progress_part / PROGRESS_WIDTH)) {
-                    ++progress_part;
-                    printf("%c", progressChar);
-                }
-            }
-            progressChar = ' ';
+            progress_block_done();
             retries = 3;
             // Get data
             NET_PutCh(NBN_BLOCK_SUCCESS);
@@ -341,22 +412,17 @@ begin_transfer:
     NET_Send("\x0D\x0A", 2);
 
 
-    printInk(INK_BLACK);
-    printPaper(INK_YELLOW);
-    printFlashOn();
+    progress_block_start();
     retries = 3;
 
 receive_last_block:
-    printf("%c", progressChar);
+    progress_block_waiting();
     if(!NBN_GetBlock(remainder)) {
-        printf("\x1C");  // move cursor back one
-        sprintf(&progressChar, "%d", retries);
-        printPaper(INK_YELLOW);
-        printInk(INK_RED);
+        progress_block_retry(retries);
 
         blocks++;
         retries--;
-        if(!retries)  exit((int)err_transfer_error);
+        if(!retries)  NBN_Fail(err_transfer_error);
 
         UART_PutCh(NBN_BLOCK_FAIL);
         NET_Send("\x0D\x0A", 2);
@@ -364,28 +430,18 @@ receive_last_block:
     }
     else {
         NBN_WriteBlock(file_out, remainder);
-
-        printPaper(INK_GREEN);
-        printFlashOff();
-        printf("\x1C");  // move cursor back one
-        if (progress_style) {
-            for (uint8_t iter8 = progress_part; iter8 > 0; --iter8) {
-                printf("%c", progressChar);
-            }
-        } else {
-            progress++;
-            if (progress >= progress_parts * (progress_part / PROGRESS_WIDTH)) {
-                ++progress_part;
-                printf("%c", progressChar);
-            }
-        }
+        progress_block_done();
     }
 
+#ifdef NBN_POSIX
+    printf("%sTransfer complete\n", quiet ? "" : "\n");
+#else
     printAtStr(13, 7, " Transfer Complete! ");
 
     printBrightOff();
     printInk(INK_BLACK);
     printPaper(INK_WHITE);
+#endif
 
     exit(0);
 }
