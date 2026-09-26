@@ -20,6 +20,12 @@ function concatTypedArrays(a: Uint8Array, b: ArrayLike<number>): Uint8Array { //
     return c;
 }
 
+function isInsideRoot(root: string, absPath: string): boolean {
+    const base = path.resolve(root);
+    const resolved = path.resolve(absPath);
+    return resolved === base || resolved.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
+}
+
 export class Server {
     protected block!: number;
     protected blockData!: Uint8Array;
@@ -104,7 +110,7 @@ export class Server {
             return;
         }
 
-        if(!absPath.startsWith(this.session.config.FILEPATH)) {
+        if(!isInsideRoot(this.session.config.FILEPATH, absPath)) {
             this.session.end("BadFile_ERROR");
             return;
         }
@@ -212,7 +218,7 @@ export class Server {
             return;
         }
 
-        if(!absPath.startsWith(this.session.config.FILEPATH)) {
+        if(!isInsideRoot(this.session.config.FILEPATH, absPath)) {
             this.session.socket.write(Uint8Array.from([60, 13, 10]));
             return;
         }
@@ -285,7 +291,7 @@ export class Server {
         const absFile = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory + file);
 
         log(absFile);
-        if (!absFile.startsWith(this.session.config.FILEPATH)) {
+        if (!isInsideRoot(this.session.config.FILEPATH, absFile)) {
             this.session.socket.write("BadPath_ERROR");
             this.session.socket.write(Uint8Array.from([13, 10]));
             return;
