@@ -1,8 +1,8 @@
-import * as fs from "fs";
-import * as path from "path";
-import { TextEncoder } from "util";
-import { log } from "./Logger";
-import { Session } from './Session';
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { TextEncoder } from "node:util";
+import { log } from "./Logger.js";
+import type { Session } from './Session.js';
 
 const MAX_FILE_SIZE = 4294967295;
 const DEFAULT_BLOCK_SIZE = 4096;
@@ -13,29 +13,28 @@ const PROTOCOL_VERSION = 2;
 const NBN_COMMAND_NEXT = "!".charCodeAt(0);
 const NBN_COMMAND_BACK = "<".charCodeAt(0);
 
-// tslint:disable-next-line:typedef
-function concatTypedArrays(a, b) { // a, b TypedArray of same type
-    const c = new (a.constructor)(a.length + b.length);
+function concatTypedArrays(a: Uint8Array, b: ArrayLike<number>): Uint8Array { // a, b TypedArray of same type
+    const c = new Uint8Array(a.length + b.length);
     c.set(a, 0);
     c.set(b, a.length);
     return c;
 }
 
 export class Server {
-    protected block: number;
-    protected blockData: Uint8Array;
-    protected blockSize: number;
-    protected checksum: number;
+    protected block!: number;
+    protected blockData!: Uint8Array;
+    protected blockSize!: number;
+    protected checksum!: number;
     protected checksumBase: number;
-    protected fileHandle: number;
+    protected fileHandle!: number;
     protected currentWorkingDirectory: string;
     protected preferredBlockSize: number;
     protected preferredDirSize: number;
-    protected remainder: number;
-    protected retries: number;
+    protected remainder!: number;
+    protected retries!: number;
     protected session: Session;
     protected state: string;
-    protected totalBlocks: number;
+    protected totalBlocks!: number;
 
     constructor(session: Session) {
         this.session = session;
@@ -118,7 +117,6 @@ export class Server {
                 this.session.end("ServerException_ERROR");
             } else {
                 // Part Zero, check the config, and see if we show hidden folders or not..
-                // @ts-ignore: readonly-array
                 let dirList:  string[] = [];
                 if(absPath.length - this.session.config.FILEPATH.length > 1) {
                     // cheap and cheerful subdir checking
@@ -143,7 +141,7 @@ export class Server {
                 const totalPages = Math.ceil(dirList.length / this.preferredDirSize );
                 const page = dirList.slice(directoryOffset, directoryOffset+this.preferredDirSize);
 
-                let listing = new Uint8Array();
+                let listing: Uint8Array = new Uint8Array();
                 page.forEach( (entry) => {
                     const fileStat = fs.statSync(absPath+entry);
                     const filesize = fileStat.size;
@@ -160,7 +158,7 @@ export class Server {
                     listing = concatTypedArrays(listing, [0]);
                 });
 
-                let header = new Uint8Array();
+                let header: Uint8Array = new Uint8Array();
                 // VER                                  Uint8 (<=63)
                 header = concatTypedArrays(header, [PROTOCOL_VERSION]);
 
@@ -200,9 +198,7 @@ export class Server {
     }
 
     protected changeDir(dir: string): void {
-        let absPath: string;
-
-        absPath  = path.resolve(dir.startsWith('/') ? (this.session.config.FILEPATH + dir + path.sep) :
+        const absPath = path.resolve(dir.startsWith('/') ? (this.session.config.FILEPATH + dir + path.sep) :
             ( this.session.config.FILEPATH + this.currentWorkingDirectory + path.sep + dir + path.sep )
         );
 
@@ -234,7 +230,6 @@ export class Server {
             } else {
 
                 // Part Zero, check the config, and see if we show hidden folders or not..
-                // @ts-ignore: readonly-array
                 let dirList:  string[] = [];
                 if(absPath.length - this.session.config.FILEPATH.length > 1) {
                     // cheap and cheerful subdir checking
@@ -256,7 +251,7 @@ export class Server {
                 const totalPages = Math.ceil(files.length / this.preferredDirSize );
                 const page = files.slice(directoryOffset, directoryOffset+this.preferredDirSize);
 
-                let header = new Uint8Array();
+                let header: Uint8Array = new Uint8Array();
                 // VER                                  Uint8 (<=63)
                 header = concatTypedArrays(header, [PROTOCOL_VERSION]);
 
@@ -325,7 +320,7 @@ export class Server {
         this.sendFileDangerous(filename, absFile, stats);
     }
 
-    protected sendFileDangerous(filename: string, absFile: string, stats: any): void {
+    protected sendFileDangerous(filename: string, absFile: string, stats: fs.Stats): void {
         this.totalBlocks = Math.floor(stats.size / this.preferredBlockSize);
         this.remainder = stats.size % this.preferredBlockSize;
         this.checksum = 0;
