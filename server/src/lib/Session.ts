@@ -42,6 +42,10 @@ export class Session {
       log(`Session error from ${socket.remoteAddress}:${socket.remotePort}: ${err.message}`);
       socket.destroy();
     });
+
+    socket.on("close", () => {
+      this.server?.closeFile();
+    });
   }
 
   public data(buffer: Buffer): void {
@@ -73,6 +77,7 @@ export class Session {
 
   public end(message: string): void {
     log(`Session disconnected from ${this.socket.remoteAddress}:${this.socket.remotePort} for ${message}` );
+    this.server?.closeFile();
 
     const error = new TextEncoder().encode(message);
     this.socket.write(concatTypedArrays(error, [13,10]));

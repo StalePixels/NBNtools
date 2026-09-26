@@ -32,7 +32,7 @@ export class Server {
     protected blockSize!: number;
     protected checksum!: number;
     protected checksumBase: number;
-    protected fileHandle!: number;
+    protected fileHandle?: number;
     protected currentWorkingDirectory: string;
     protected preferredBlockSize: number;
     protected preferredDirSize: number;
@@ -91,6 +91,7 @@ export class Server {
                 break;
             case "C":    // FILE COMPLETE
                 if(buffer[0] === NBN_COMMAND_NEXT) {
+                    this.closeFile();
                     this.session.state = 'W';
                 } else if(buffer[0] === NBN_COMMAND_BACK) {
                     this.retries++;
@@ -284,7 +285,15 @@ export class Server {
         });
     }
 
+    public closeFile(): void {
+        if (this.fileHandle !== undefined) {
+            fs.closeSync(this.fileHandle);
+            this.fileHandle = undefined;
+        }
+    }
+
     protected sendFile(file: string): void {
+        this.closeFile();
         this.block = 0;
         this.blockSize = this.preferredBlockSize;               // Variable blocksize, we shorten the last to fit
 
@@ -334,6 +343,8 @@ export class Server {
         fs.open(absFile, 'r',  (err, fd) => {
             if (err) {
                 this.session.end("ServerException_ERROR");
+            } else if (this.session.socket.destroyed) {
+                fs.closeSync(fd);
             } else {
                 this.fileHandle = fd;
                 // Send the FILEHEADER
@@ -366,7 +377,7 @@ export class Server {
             this.state = "C";       // We've now COMPLETED reading all the blocks
         }
 
-        fs.read(this.fileHandle, this.blockData, 0, this.blockSize , null,  (err, bytesRead) => {
+        fs.read(this.fileHandle!, this.blockData, 0, this.blockSize , null,  (err, bytesRead) => {
             if (bytesRead < this.blockSize) {
                 this.session.end("ServerException_ERROR");
             } else if (err) {
