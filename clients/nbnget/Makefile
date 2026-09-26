@@ -46,7 +46,7 @@ DEBUGFLAGS := --list --c-code-in-asm
 
 POSIX_DIR ?= ./BUILD-posix
 POSIX_CC ?= cc
-POSIX_CFLAGS ?= -DNBN_POSIX -O2 -Wall -Wno-pointer-sign
+POSIX_CFLAGS ?= -O2 -Wall -Wno-pointer-sign
 POSIX_SRC := nbnget.c ../common/nbn.c ../common/net_posix.c ../common/posix.c
 POSIX_GEN := $(POSIX_DIR)/messages.c $(POSIX_DIR)/help.c
 

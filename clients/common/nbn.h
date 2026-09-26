@@ -22,7 +22,7 @@
 #define NBN_GetUInt16                   UART_GetUInt16
 #define NBN_GetUInt32                   UART_GetUInt32
 
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
 #define NBN_PageIn()
 #define NBN_PageOut()
 #else

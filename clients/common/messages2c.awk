@@ -1,4 +1,4 @@
-# Converts messages.asm into C strings for NBN_POSIX builds.
+# Converts messages.asm into C strings for POSIX host builds.
 # In the asm, bit 7 of the last character ends each string (the NextZXOS
 # error format), so that character is written separately as 'c' + 0x80.
 

@@ -1,5 +1,5 @@
 //
-// TCP transport for NBN_POSIX builds. It replaces uart.c and net.c: the
+// TCP transport for POSIX host builds. It replaces uart.c and net.c: the
 // UART_ and NET_ calls use a socket, not ESP8266 AT commands.
 //
 // Writes are held in a buffer and sent in one write() just before the next

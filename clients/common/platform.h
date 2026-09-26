@@ -1,12 +1,12 @@
 //
-// Build switch. The default build is z88dk for the ZX Spectrum Next.
-// Build with -DNBN_POSIX for a POSIX host (macOS first).
+// Build switch. zcc +zxn defines __ZXNEXT, and that selects the Next code.
+// Any other compiler builds for a POSIX host (macOS first).
 //
 
 #ifndef NBNTOOLS_PLATFORM_H
 #define NBNTOOLS_PLATFORM_H
 
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>

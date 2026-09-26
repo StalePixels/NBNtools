@@ -1,5 +1,5 @@
 //
-// Host support for NBN_POSIX builds: error exits and the esxdos file calls.
+// Host support for POSIX host builds: error exits and the esxdos file calls.
 //
 
 #include <errno.h>

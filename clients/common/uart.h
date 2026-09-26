@@ -10,7 +10,7 @@
 
 #include "platform.h"
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
 __sfr __banked __at 0x153b IO_153B;
 __sfr __banked __at 0x153b IO_UART_CONTROL;
 #endif

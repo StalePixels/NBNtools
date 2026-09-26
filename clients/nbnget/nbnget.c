@@ -1,4 +1,4 @@
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
 #include <inttypes.h>
 #else
 #pragma printf = "%ld %lu %d %s %c %u %x"
@@ -25,7 +25,7 @@
 #include "../common/uart.h"
 #include "../common/net.h"
 #include "../common/nbn.h"
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
 #include "../common/ula.h"
 #include "../common/spui_lite.h"
 
@@ -45,7 +45,7 @@ static uint16_t checksum;
 // for loops
 uint32_t counter;
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
 // Machine State
 static unsigned long uart_clock[] = { CLK_28_0, CLK_28_1, CLK_28_2, CLK_28_3, CLK_28_4, CLK_28_5, CLK_28_6, CLK_28_7 };
 static unsigned char old_cpu_speed;
@@ -83,7 +83,7 @@ static void shutdown() {
     esxdos_f_close(file_out);
     NBN_Free();
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     zx_border(7);
     ZXN_NEXTREGA(REG_TURBO_MODE, old_cpu_speed);
 #endif
@@ -93,7 +93,7 @@ static void help_and_exit(unsigned char *error) __z88dk_fastcall {
     printf("%s",help);
     printf("\nv%s by %s",version, credits);
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     ZXN_NEXTREGA(REG_TURBO_MODE, old_cpu_speed);
 #endif
     if(error) NBN_Fail(error);
@@ -102,7 +102,7 @@ static void help_and_exit(unsigned char *error) __z88dk_fastcall {
 
 // Colours for the next progress bar cell
 static void progress_block_start(void) {
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     if(quiet) return;
     printInk(INK_BLACK);
     printPaper(INK_YELLOW);
@@ -112,14 +112,14 @@ static void progress_block_start(void) {
 
 // Show the cell for the block now in transfer
 static void progress_block_waiting(void) {
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     if(quiet) return;
     printf("%c", progressChar);
 #endif
 }
 
 static void progress_block_retry(uint8_t retries) {
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
     fprintf(stderr, "Block checksum failed, %d tries left\n", retries - 1);
 #else
     if(quiet) return;
@@ -132,7 +132,7 @@ static void progress_block_retry(uint8_t retries) {
 
 static void progress_block_done(void) {
     if(quiet) return;
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     printPaper(INK_GREEN);
     printFlashOff();
     printf("\x1C");  // move cursor back one
@@ -147,7 +147,7 @@ static void progress_block_done(void) {
     progress++;
     if (progress >= progress_parts * (progress_part / PROGRESS_WIDTH)) {
         ++progress_part;
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
         putchar('#');
         fflush(stdout);
 #else
@@ -158,7 +158,7 @@ static void progress_block_done(void) {
 }
 
 int main(int argc, char** argv) {
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     // We need to restore this on exit...
     old_cpu_speed = ZXN_READ_REG(REG_TURBO_MODE);
 
@@ -245,7 +245,7 @@ int main(int argc, char** argv) {
     // Register a default shutown routine, to restore the settings we changed, and handle network, etc...
     atexit(shutdown);
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     // Work out our real speed, based on video timing, and set the UART accordingly (move to common/uart later)
     IO_NEXTREG_REG = REG_VIDEO_TIMING;
     prescalar = uart_clock[IO_NEXTREG_DAT] / 115200UL;
@@ -267,7 +267,7 @@ int main(int argc, char** argv) {
 
     NET_Connect((customServer ? argv[customServer] : (char *)defaultServer), (customPort ? argv[customPort] : (char *)defaultPort));
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     errno = UART_WaitOK(false);
 
     if(errno) {
@@ -276,7 +276,7 @@ int main(int argc, char** argv) {
 #endif
     printf("\nConnected!\n");
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
     NET_ModeSingle();
 
     NET_OpenSocket();
@@ -332,7 +332,7 @@ begin_transfer:
         exit(errno);
     }
 
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
     printf("Name: %s\nSize: %" PRIu32 " bytes\n", filename, size);
 #else
     zx_cls(PAPER_WHITE);
@@ -433,7 +433,7 @@ receive_last_block:
         progress_block_done();
     }
 
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
     printf("%sTransfer complete\n", quiet ? "" : "\n");
 #else
     printAtStr(13, 7, " Transfer Complete! ");

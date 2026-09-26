@@ -2,7 +2,7 @@
 // Created by D Rimron-Soutter on 31/03/2020.
 //
 
-#ifndef NBN_POSIX
+#ifdef __ZXNEXT
 #include <arch/zxn.h>
 #include <arch/zxn/esxdos.h>
 #endif
@@ -18,7 +18,7 @@
 uint8_t nbnBottom8KPage = 0, nbnTop8KPage = 0;
 unsigned char nbnBuff[260];
 
-#ifdef NBN_POSIX
+#ifndef __ZXNEXT
 // The same size as the two 8K pages the Next build uses
 static unsigned char nbnBlockMemory[16384];
 unsigned char *nbnBlock = nbnBlockMemory;
