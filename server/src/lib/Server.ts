@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { TextEncoder } from "node:util";
 import { log } from "./Logger.js";
-import type { Session } from './Session.js';
+import { closeWith, type Answer, type Session } from './Session.js';
 
 const MAX_FILE_SIZE = 4294967295;
 const DEFAULT_BLOCK_SIZE = 4096;
@@ -41,8 +41,7 @@ export class Server {
     protected blockSize!: number;
     protected checksum!: number;
     protected checksumBase: number;
-    protected fileHandle?: number;
-    protected reading?: Promise<void>;
+    protected fileHandle?: fs.promises.FileHandle;
     protected currentWorkingDirectory: string;
     protected preferredBlockSize: number;
     protected preferredDirSize: number;
@@ -63,55 +62,51 @@ export class Server {
         log(`PersonalServer created for ${this.session.socket.remoteAddress}:${this.session.socket.remotePort}` );
     }
 
-    public command(cmd: string, params: readonly string[]): void {
+    public async command(cmd: string, params: readonly string[]): Promise<Answer> {
         log("COMMAND "+cmd+" WITH "+params);
         switch (cmd) {
             case "GET":
-                this.holdFor(this.sendFile(params.join(' ')));
-                break;
+                return this.sendFile(params.join(' '));
             case "DIR":
                 this.block = 0;
-                this.holdFor(this.sendDir(params));
-                break;
+                return this.sendDir(params);
             case "CD":
                 this.block = 0;
-                this.holdFor(this.changeDir(params.join(' ')));
-                break;
+                return this.changeDir(params.join(' '));
             case "QUIT":
-                this.session.end("OK");
-                break;
+                return closeWith("OK");
             case "!":
-                break;
+                return { bytes: new Uint8Array() };
             case "<":
                 if (this.block > 0) {
-                    this.resendBlock();
+                    return this.resendBlock();
                 }
-                break;
+                return { bytes: new Uint8Array() };
             default:
-                this.session.end("BadCommand_ERROR");
+                return closeWith("BadCommand_ERROR");
         }
     }
 
     // Old clients send "!1" as well as "!" for each block. Only the first "!1",
     //    which acknowledges the header, counts; later ones repeat the "!".
-    public data(line: string): void {
+    public async data(line: string): Promise<Answer> {
         if (line === "!1" && this.block > 0) {
-            return;
+            return { bytes: new Uint8Array() };
         }
         if (line.charCodeAt(0) === NBN_COMMAND_ACK) {
-            this.acknowledge();
+            return this.acknowledge();
         } else if (line.charCodeAt(0) === NBN_COMMAND_BACK) {
-            this.resendBlock();
+            return this.resendBlock();
         }
+        return { bytes: new Uint8Array() };
     }
 
-    protected acknowledge(): void {
+    protected async acknowledge(): Promise<Answer> {
         switch(this.state) {
             case "S":     // SERVING file to NBNClient
                 this.block++;
                 this.retries = 0;
-                this.readFileBlock();
-                break;
+                return this.readFileBlock();
             case "C":    // FILE COMPLETE
                 this.closeFile();
                 this.session.state = 'W';
@@ -119,37 +114,26 @@ export class Server {
             default:
                 break;
         }
+        return { bytes: new Uint8Array() };
     }
 
-    // The session handles its next line only after this work has finished.
-    protected holdFor(work: Promise<void>): void {
-        const release = this.session.hold();
-        work.catch((err: unknown) => {
-            log(err);
-            this.session.end("ServerException_ERROR");
-        }).finally(release);
-    }
-
-    protected resendBlock(): void {
+    protected resendBlock(): Answer {
         if(this.retries<3) {
             this.retries++;
-            this.sendBlock();
-        } else {
-            this.session.end("ExcessRetries_ERROR");
+            return { bytes: this.sendBlock() };
         }
+        return closeWith("ExcessRetries_ERROR");
     }
 
-    protected async sendDir(params: readonly string[] = []): Promise<void> {
+    protected async sendDir(params: readonly string[] = []): Promise<Answer> {
         const absPath = path.resolve(this.session.config.FILEPATH + this.currentWorkingDirectory)+path.sep;
 
         if (!(await exists(absPath))) {
-            this.session.end("BadFile_ERROR");
-            return;
+            return closeWith("BadFile_ERROR");
         }
 
         if(!isInsideRoot(this.session.config.FILEPATH, absPath)) {
-            this.session.end("BadFile_ERROR");
-            return;
+            return closeWith("BadFile_ERROR");
         }
 
         const relPath = absPath.replace(this.session.config.FILEPATH, '');
@@ -221,41 +205,32 @@ export class Server {
         // Size of NBNBlock                     Uint16
         header = concatTypedArrays(header, [(listing.length) & 255, (listing.length >> 8)]);
 
-        // Send the DIRHEADER
-        this.session.socket.write(header);
-
-        // Send the filenames
-
-        this.session.socket.write(listing);
         this.checksum = 0;
         for (const letter of listing) {
             this.checksum = this.checksum + letter;
         }
         this.checksum = this.checksum % this.checksumBase;
-        this.session.socket.write(Uint8Array.from([this.checksum]));
+
+        // Send the DIRHEADER, the filenames and the checksum
+        return { bytes: concatTypedArrays(concatTypedArrays(header, listing), [this.checksum]) };
     }
 
-    protected async changeDir(dir: string): Promise<void> {
+    protected async changeDir(dir: string): Promise<Answer> {
         const absPath = path.resolve(dir.startsWith('/') ? (this.session.config.FILEPATH + dir) :
             ( this.session.config.FILEPATH + this.currentWorkingDirectory + path.sep + dir )
         ) + path.sep;
 
         if (!(await exists(absPath))) {
-            this.session.socket.write(Uint8Array.from([60, 13, 10]));
-            return;
+            return { bytes: Uint8Array.from([60, 13, 10]) };
         }
 
         if(!(await fs.promises.stat(absPath)).isDirectory()) {
-            this.session.socket.write(Uint8Array.from([60, 13, 10]));
-            return;
+            return { bytes: Uint8Array.from([60, 13, 10]) };
         }
 
         if(!isInsideRoot(this.session.config.FILEPATH, absPath)) {
-            this.session.socket.write(Uint8Array.from([60, 13, 10]));
-            return;
+            return { bytes: Uint8Array.from([60, 13, 10]) };
         }
-
-        this.session.socket.write(Uint8Array.from([33, 13, 10]));
 
         const relPath = absPath.replace(this.session.config.FILEPATH, '');
 
@@ -306,25 +281,22 @@ export class Server {
         // Total Pages in the dir               Uint16
         header = concatTypedArrays(header, [(totalPages) & 255, (totalPages >> 8)]);
 
-        // Send the DIRHEADER
-        this.session.socket.write(header);
-
+        // Send "!" and the DIRHEADER
+        return { bytes: concatTypedArrays(Uint8Array.from([33, 13, 10]), header) };
     }
 
-    // The handle is cleared at once so a second call does nothing; the close
-    //    itself waits for any read still using it.
+    // The handle is cleared at once so a second call does nothing;
+    //    FileHandle.close() waits for any read still using it.
     public closeFile(): void {
-        const fd = this.fileHandle;
-        if (fd === undefined) {
+        const file = this.fileHandle;
+        if (file === undefined) {
             return;
         }
         this.fileHandle = undefined;
-        void (this.reading ?? Promise.resolve()).then(() => {
-            fs.close(fd, () => undefined);
-        });
+        file.close().catch(() => undefined);
     }
 
-    protected async sendFile(file: string): Promise<void> {
+    protected async sendFile(file: string): Promise<Answer> {
         this.closeFile();
         this.block = 0;
         this.blockSize = this.preferredBlockSize;               // Variable blocksize, we shorten the last to fit
@@ -333,76 +305,60 @@ export class Server {
 
         log(absFile);
         if (!isInsideRoot(this.session.config.FILEPATH, absFile)) {
-            this.session.socket.write("BadPath_ERROR");
-            this.session.socket.write(Uint8Array.from([13, 10]));
-            return;
+            return { bytes: new TextEncoder().encode("BadPath_ERROR\r\n") };
         }
 
         const stats = await fs.promises.stat(absFile).catch(() => undefined);
 
         if (stats === undefined || stats.isDirectory()) {
-            this.session.socket.write("NoFile_ERROR");
-            this.session.socket.write(Uint8Array.from([13, 10]));
-            return;
+            return { bytes: new TextEncoder().encode("NoFile_ERROR\r\n") };
         }
 
         log(`STATING ${absFile}" `);
 
         if (stats.size > MAX_FILE_SIZE) {
-            this.session.socket.write("FileTooBig_ERROR");
-            this.session.socket.write(Uint8Array.from([13, 10]));
-            return;
+            return { bytes: new TextEncoder().encode("FileTooBig_ERROR\r\n") };
         }
 
         const filename = path.basename(absFile);
 
         if (filename.length > 127) {
-            this.session.end("FilenameTooLong_ERROR");
             this.state = "Q";        // QUIT
-            return;
+            return closeWith("FilenameTooLong_ERROR");
         }
 
         this.session.state = "S";                               // Flag in session
         this.state = "S";                                       // Flag in handler
-        this.sendFileDangerous(filename, absFile, stats);
+        return this.sendFileDangerous(filename, absFile, stats);
     }
 
-    protected sendFileDangerous(filename: string, absFile: string, stats: fs.Stats): void {
+    protected async sendFileDangerous(filename: string, absFile: string, stats: fs.Stats): Promise<Answer> {
         this.totalBlocks = Math.floor(stats.size / this.preferredBlockSize);
         this.remainder = stats.size % this.preferredBlockSize;
         this.checksum = 0;
 
-        const release = this.session.hold();
-        fs.open(absFile, 'r',  (err, fd) => {
-            if (err) {
-                this.session.end("ServerException_ERROR");
-                release();
-            } else if (this.session.socket.destroyed) {
-                fs.close(fd, () => undefined);
-                release();
-            } else {
-                this.fileHandle = fd;
-                // Send the FILEHEADER
-                this.session.socket.write(Uint8Array.from([
-                    // Protocol Version    Uint8
-                    PROTOCOL_VERSION,
-                    // Size                Uint32
-                    (stats.size) & 255, (stats.size >> 8) & 255, (stats.size >> 16) & 255, (stats.size >> 24),          // needs a little indian helper
-                    // Complete Blocks     Uint32
-                    (this.totalBlocks) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 24), // needs a little indian helper
-                    // Bytes Remaining     Uint16
-                    this.remainder & 255, (this.remainder >> 8), // needs a little indian helper
-                ]));
-                // String <128char     UChar
-                this.session.socket.write(filename);
-
-                // Terminating NULL    0x00
-                this.session.socket.write(Uint8Array.from([0]), () => release());
-            }
-        });
+        const file = await fs.promises.open(absFile, 'r');
+        if (this.session.socket.destroyed) {
+            await file.close();
+            return { bytes: new Uint8Array() };
+        }
+        this.fileHandle = file;
+        // Send the FILEHEADER
+        const header = Uint8Array.from([
+            // Protocol Version    Uint8
+            PROTOCOL_VERSION,
+            // Size                Uint32
+            (stats.size) & 255, (stats.size >> 8) & 255, (stats.size >> 16) & 255, (stats.size >> 24),          // needs a little indian helper
+            // Complete Blocks     Uint32
+            (this.totalBlocks) & 255, (this.totalBlocks >> 8) & 255, (this.totalBlocks >> 16) & 255, (this.totalBlocks >> 24), // needs a little indian helper
+            // Bytes Remaining     Uint16
+            this.remainder & 255, (this.remainder >> 8), // needs a little indian helper
+        ]);
+        // String <128char     UChar, then Terminating NULL    0x00
+        return { bytes: concatTypedArrays(concatTypedArrays(header, new TextEncoder().encode(filename)), [0]) };
     }
 
-    protected readFileBlock(): void {
+    protected async readFileBlock(): Promise<Answer> {
         this.blockData = new Uint8Array(this.blockSize);
         this.checksum = 0;
         this.retries = 0;
@@ -412,38 +368,27 @@ export class Server {
             this.state = "C";       // We've now COMPLETED reading all the blocks
         }
 
-        const fd = this.fileHandle;
-        if (fd === undefined) {
-            this.session.end("ServerException_ERROR");
-            return;
+        const file = this.fileHandle;
+        if (file === undefined) {
+            log("No file is open");
+            return closeWith("ServerException_ERROR");
         }
-        const release = this.session.hold();
-        let readDone!: () => void;
-        this.reading = new Promise((resolve) => {
-            readDone = resolve;
-        });
-        fs.read(fd, this.blockData, 0, this.blockSize , null,  (err, bytesRead) => {
-            readDone();
-            if (this.fileHandle !== fd) {
-                release();
-            } else if (bytesRead < this.blockSize) {
-                this.session.end("ServerException_ERROR");
-                release();
-            } else if (err) {
-                this.session.end("ServerException_ERROR");
-                release();
-            } else {
-                for (let i = 0; i < this.blockSize; i++) {
-                    this.checksum = this.checksum + this.blockData[i];
-                }
-                this.checksum = this.checksum % this.checksumBase;
-                this.sendBlock(release);
-            }
-        });
+        const { bytesRead } = await file.read(this.blockData, 0, this.blockSize, null);
+        if (this.fileHandle !== file) {
+            return { bytes: new Uint8Array() };
+        }
+        if (bytesRead < this.blockSize) {
+            log(`Short read: ${bytesRead} of ${this.blockSize} bytes`);
+            return closeWith("ServerException_ERROR");
+        }
+        for (let i = 0; i < this.blockSize; i++) {
+            this.checksum = this.checksum + this.blockData[i];
+        }
+        this.checksum = this.checksum % this.checksumBase;
+        return { bytes: this.sendBlock() };
     }
 
-    protected sendBlock(done?: () => void): void {
-        this.session.socket.write(this.blockData.slice(0, this.blockSize));
-        this.session.socket.write(Uint8Array.from([this.checksum]), () => done?.());
+    protected sendBlock(): Uint8Array {
+        return concatTypedArrays(this.blockData.slice(0, this.blockSize), [this.checksum]);
     }
 }
