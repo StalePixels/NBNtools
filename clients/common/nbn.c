@@ -81,7 +81,7 @@ bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall {
     if(nbnChecksum == nbnComputed) {
         return true;
     }
-    printf("%d vs %d\n\n", nbnComputed, nbnChecksum);
+    printf("Checksum %d/%d\n\n", nbnComputed, nbnChecksum);
     return false;
 }
 
