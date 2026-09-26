@@ -70,9 +70,11 @@ export class Server {
                 this.holdFor(this.sendFile(params.join(' ')));
                 break;
             case "DIR":
+                this.block = 0;
                 this.holdFor(this.sendDir(params));
                 break;
             case "CD":
+                this.block = 0;
                 this.holdFor(this.changeDir(params.join(' ')));
                 break;
             case "QUIT":
