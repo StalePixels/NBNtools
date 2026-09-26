@@ -1,47 +1,36 @@
-import * as net from 'net'
-import { TextEncoder } from "util";
-import { log } from './Logger';
+import type * as net from 'node:net';
+import { TextEncoder } from 'node:util';
+import type { Config } from './Config.js';
+import { log } from './Logger.js';
+import type { Server } from './Server.js';
+
 // Differnt classess mean content servers can add additional features (such as Authentication,
 //    and gateways to custom/private services to the codebase, easily, without breaking
 //    the licence on the open source portions of the software - or bloating the base protocol.
-import { NBNServer as Server } from './PersonalServer/NBNServer';
-// This is now the "correct" way to do this, we no longer call Server types, but
-//    NBNServer handles the CDN/Personal seperation via different classes by
-//    wrapping a sibling class --  THIS IS PURELY FOR DEVOPS REASONS -- it means we
-//    can switch different server providers by swapping symlinks along!
+export type ServerClass = new (session: Session) => Server;
 
-function concatTypedArrays(a: any, b: any): any { // a, b TypedArray of same type
-  const c = new (a.constructor)(a.length + b.length);
+function concatTypedArrays(a: Uint8Array, b: ArrayLike<number>): Uint8Array { // a, b TypedArray of same type
+  const c = new Uint8Array(a.length + b.length);
   c.set(a, 0);
   c.set(b, a.length);
   return c;
 }
 
 export class Session {
-  public readonly config: any;
+  public readonly config: Config;
   public socket: net.Socket;
   public state: string;
 
-  private server: Server;
+  private server?: Server;
 
-  constructor(socket: net.Socket, config: any) {
+  constructor(socket: net.Socket, config: Config, ServerType: ServerClass) {
     this.config = config;
     this.socket = socket;
 
-    /*
-     *
-     * Establish our file-server, this handles all the protocol management and is a reduced version of
-     *   NBNServer with less features and commands.
-     *
-     *   This replaces any references you may see to NBNServer Class through-out the source code.
-     *
-     *   NBNServer is the CLOSED SOURCE module that has houses our special network source (catalogs, service
-     *   gateways, and other planned features)
-     */
-    this.server = new Server(this);
+    this.server = new ServerType(this);
     this.state = "W";       // WAITING for command
 
-    log(Server);
+    log(ServerType);
 
     // Set up socket listeners
     socket.on("data", (buffer) => {
@@ -52,7 +41,7 @@ export class Session {
 
   public data(buffer: Buffer): void {
     switch(this.state) {
-      case "W":     // WAITING for command
+      case "W": {   // WAITING for command
         // Parse the commands
         const cmds = buffer.toString()                          // As string
             .replace(/^\s+|\s+$/g, '')  // Remove CR if any
@@ -61,11 +50,12 @@ export class Session {
         const params = cmds.slice(1,);                          // Leftovers after start of string
         log(`Dispatching COMMAND: "${cmd}" PARAMS: `, params, " to NBNServer");
 
-        this.server.command(cmd, params);
+        this.server?.command(cmd, params);
 
         break;
+      }
       case "S":     // data currently being SENT by (NBN)Server
-          this.server.data(buffer);
+          this.server?.data(buffer);
         break;
       default:
         break;
@@ -80,10 +70,9 @@ export class Session {
     log(`Session disconnected from ${this.socket.remoteAddress}:${this.socket.remotePort} for ${message}` );
 
     const error = new TextEncoder().encode(message);
-    this.socket.write(concatTypedArrays(error, Uint8Array.from([13,10])));
+    this.socket.write(concatTypedArrays(error, [13,10]));
 
     this.socket.end();
-    delete this.socket;
   }
 
 }

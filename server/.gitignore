@@ -8,4 +8,3 @@ config.json
 yarn.lock
 public/*
 build/*
-src/lib/PersonalServer*

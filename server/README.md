@@ -12,9 +12,9 @@ If you choose to run this software you take all security responsibilities upon y
 **YOU HAVE BEEN WARNED**
 
 ## To Run
-Requires Node JS v12.
+Requires Node.js 24.
 
-Run `npm start`, will serve files from the public folder.
+Run `npm install` (which also builds), then `npm start`. It serves files from the public folder, or from the folder in `NBN_FILEPATH`.
 
 Currently `config.json` support is missing, this is coming soon.
 

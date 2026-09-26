@@ -1,17 +1,12 @@
-import fs from "fs";
-import path from "path";
-import { log } from "../Logger";
-import { Server } from '../Server';
-import { Session } from "../Session";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { log } from "./lib/Logger.js";
+import { Server } from './lib/Server.js';
 
 const MAX_MOTD_SIZE = 4096;
 
 export class PersonalServer extends Server {
-    constructor(session: Session){
-        super(session);
-    }
-
-    public command(cmd: string, params: readonly string[]): void {
+    public override command(cmd: string, params: readonly string[]): void {
         log("PersonalServer COMMAND "+cmd+" WITH "+params);
         switch (cmd) {
             case "MOTD":
