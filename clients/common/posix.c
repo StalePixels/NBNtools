@@ -19,7 +19,7 @@ void NBN_Fail(const unsigned char *message) {
 }
 
 // $HOME/.nbn stands in for the Next's SD card
-static const char *card_dirs[] = { "", "/sys" };
+static const char *card_dirs[] = { "", "/sys", "/tmp" };
 
 __attribute__((constructor)) static void card_setup(void) {
     const char *home = getenv("HOME");
