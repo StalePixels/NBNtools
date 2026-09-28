@@ -12,6 +12,7 @@ add_executable(nbnget
 
 # Common Library Code
 	../common/nbn.c
+	../common/nbn_pages.c
 	../common/net.c
 	../common/uart.c
 	../common/util.c

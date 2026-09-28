@@ -6,3 +6,4 @@ help.asm
 ../common/uart.c
 ../common/net.c
 ../common/nbn.c
+../common/nbn_pages.c

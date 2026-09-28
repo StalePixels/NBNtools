@@ -15,37 +15,7 @@
 #include "messages.h"
 #include "net.h"
 
-uint8_t nbnBottom8KPage = 0, nbnTop8KPage = 0;
 unsigned char nbnBuff[260];
-
-#ifndef __ZXNEXT
-// The same size as the two 8K pages the Next build uses
-static unsigned char nbnBlockMemory[16384];
-unsigned char *nbnBlock = nbnBlockMemory;
-
-bool NBN_Malloc() {
-    return true;
-}
-
-void NBN_Free() {
-}
-#else
-unsigned char *nbnBlock = 0x4000;
-
-bool NBN_Malloc() {
-    nbnBottom8KPage = esx_ide_bank_alloc(0);
-    nbnTop8KPage = esx_ide_bank_alloc(0);
-
-    if (!nbnBottom8KPage || !nbnTop8KPage) return false;
-
-    return true;
-}
-
-void NBN_Free() {
-    if(nbnBottom8KPage) esx_ide_bank_free(0, nbnBottom8KPage);
-    if(nbnTop8KPage)    esx_ide_bank_free(0, nbnTop8KPage);
-}
-#endif
 
 unsigned char NBN_GetStatus() {
     unsigned char status[4];
