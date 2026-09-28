@@ -20,7 +20,7 @@
 
 int NET_Command(char command[], uint8_t len) __z88dk_fastcall;
 //int NET_Send(char command[], uint8_t len);
-void NET_Close();
+void NET_Close(bool delay) __z88dk_fastcall;
 uint8_t NET_GetOK(bool localecho) __z88dk_fastcall;
 void NET_Connect(char* server, char* port);
 void NET_ModeSingle();

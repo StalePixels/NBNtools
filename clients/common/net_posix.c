@@ -133,7 +133,8 @@ void NET_Connect(char* server, char* port) {
     if (netSocket < 0) NBN_Fail(err_failed_connection);
 }
 
-void NET_Close() {
+// The delay is for the ESP8266 escape sequence, which a socket does not have
+void NET_Close(bool delay) {
     if (netSocket < 0) return;
 
     net_flush();

@@ -18,9 +18,17 @@ int NET_Command(char command[], uint8_t len) __z88dk_fastcall {
     return UART_WaitOK(false);
 }
 
-void NET_Close(void) {
+// A frame is 20 ms at 50 Hz and 16.7 ms at 60 Hz: 4 frames are at least 60 ms, 60 frames at
+// least 1 s. The ESP8266 sees "+++" only as a packet of its own, with quiet time on both sides.
+// A caller that has sent nothing for 60 ms already can pass delay = false
+#define GUARD_BEFORE    4
+#define GUARD_AFTER     60
+
+void NET_Close(bool delay) __z88dk_fastcall {
+    if(delay) wait_frames(GUARD_BEFORE);
     UART_Send("+++", 3);
-    looper(1024);
+    wait_frames(GUARD_AFTER);
+    UART_Drain();
 
     NET_Command("MODE=0", 6);
     NET_Command("CLOSE", 5);

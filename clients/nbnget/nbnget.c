@@ -79,7 +79,7 @@ static char progressChar = ' ';
 
 
 static void shutdown() {
-    NET_Close();
+    NET_Close(true);
     esxdos_f_close(file_out);
     NBN_Free();
 
@@ -259,7 +259,7 @@ int main(int argc, char** argv) {
 
     if(errno || resetWifi) {
         printf("Closing Existing connections...\n");
-        NET_Close();
+        NET_Close(true);
     }
 #endif
 

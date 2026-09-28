@@ -18,6 +18,7 @@ __sfr __banked __at 0x153b IO_UART_CONTROL;
 #define DEFAULT_TIMEOUT         131071UL
 
 unsigned char UART_GetUChar();
+void UART_Drain();
 void UART_GetUInt16(uint8_t* val) __z88dk_fastcall;
 void UART_GetUInt32(uint8_t* val) __z88dk_fastcall;
 

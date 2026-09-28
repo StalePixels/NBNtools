@@ -57,7 +57,7 @@ uint8_t commandLen;
 
 // UI Line buffer
 static void shutdown() {
-    NET_Close();
+    NET_Close(true);
     if(file_out != NO_FILE) esxdos_f_close(file_out);
     NBN_Free();
 
@@ -551,7 +551,7 @@ int main(int argc, char** argv) {
 
     if(errno || resetWifi) {
         printf("Closing Existing connections...\n");
-        NET_Close();
+        NET_Close(true);
     }
 
     printf("Opening: NextBestNetwork\n");

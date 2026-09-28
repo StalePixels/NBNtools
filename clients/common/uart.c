@@ -27,6 +27,10 @@ unsigned char UART_GetUChar() {
     exit((int)err_timeout_byte);
 }
 
+void UART_Drain() {
+    while (IO_UART_STATUS & IUS_RX_AVAIL) IO_UART_RX;
+}
+
 void UART_GetUInt16(uint8_t* val) __z88dk_fastcall {
     *val = UART_GetUChar();
     *(++val) = UART_GetUChar();
