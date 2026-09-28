@@ -35,9 +35,11 @@ __attribute__((constructor)) static void card_setup(void) {
     errno = error;
 }
 
+// The pretend card is drive C:, so "C:/x" is the same file as "/x"
 static const char *sd_path(char *buf, const char *path) {
     const char *home = getenv("HOME");
 
+    if ((path[0] == 'C' || path[0] == 'c') && path[1] == ':') path += 2;
     if (path[0] != '/') return path;
     if (!home || !*home) {
         errno = ENOENT;
