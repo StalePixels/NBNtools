@@ -5,8 +5,15 @@
   // Where the docroot live
   "FILEPATH": "public",
 
+  // Milliseconds a connection may be silent before the server closes it
+  "IDLE": 600000,
+
   // Interface to bind to, default means all
   "IP": "0.0.0.0",
+
+  // Most connections open at once, and most from one address
+  "MAXCONNS": 512,
+  "MAXPERIP": 16,
 
   // TCP port to listen on
   "PORT": 48128,

@@ -5,6 +5,8 @@ import { Session, type ServerClass } from './Session.js';
 
 export const startServer = (ServerType: ServerClass): net.Server => {
   const config = loadConfig();
+  const perAddress = new Map<string, number>();
+  let open = 0;
 
   // 'connection' listener.
   const server  = net.createServer((socket) => {
@@ -34,6 +36,30 @@ export const startServer = (ServerType: ServerClass): net.Server => {
 
       // Connection Listener
       .on('connection', socket => {
+        const address = socket.remoteAddress ?? '';
+        const mine = perAddress.get(address) ?? 0;
+        if (open >= config.MAXCONNS || mine >= config.MAXPERIP) {
+          log(`Refused ${address}: ${open} open, ${mine} from this address`);
+          socket.destroy();
+          return;
+        }
+        open++;
+        perAddress.set(address, mine + 1);
+        socket.on('close', () => {
+          open--;
+          const left = (perAddress.get(address) ?? 1) - 1;
+          if (left > 0) {
+            perAddress.set(address, left);
+          } else {
+            perAddress.delete(address);
+          }
+        });
+        // No message: an ESP8266 in passthrough mode connects again by itself, and a
+        //    message would wait in the Next's UART until its next request.
+        socket.setTimeout(config.IDLE, () => {
+          log(`Idle for ${config.IDLE}ms: ${address}:${socket.remotePort}`);
+          socket.destroy();
+        });
         new Session(socket, config, ServerType);
       })
 
