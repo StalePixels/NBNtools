@@ -67,9 +67,9 @@ void NBN_StatDirectory(nbnDirectory_t *dir) __z88dk_fastcall;
 void NBN_GetDirectory(nbnDirectory_t *dir) __z88dk_fastcall;
 
 // MemManager for the RAM we page over the ULA
-bool NBN_Malloc();
-void NBN_Free();
-unsigned char NBN_GetStatus();
+bool NBN_Malloc(void);
+void NBN_Free(void);
+unsigned char NBN_GetStatus(void);
 
 // THIS DOES ULA MEMORY PAGING, DO NOT RUN WITH INTERRUPTS ENABLED - JUST IN CASE!
 bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall;

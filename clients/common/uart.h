@@ -17,8 +17,8 @@ __sfr __banked __at 0x153b IO_UART_CONTROL;
 
 #define DEFAULT_TIMEOUT         131071UL
 
-unsigned char UART_GetUChar();
-void UART_Drain();
+unsigned char UART_GetUChar(void);
+void UART_Drain(void);
 void UART_GetUInt16(uint8_t* val) __z88dk_fastcall;
 void UART_GetUInt32(uint8_t* val) __z88dk_fastcall;
 
@@ -28,5 +28,5 @@ void UART_PutCh(char c);
 uint8_t UART_WaitOK(bool localecho) __z88dk_fastcall;
 uint8_t UART_GetStatus(bool localecho) __z88dk_fastcall;
 int Net_Command(char command[], uint8_t len);
-void UART_Close();
+void UART_Close(void);
 #endif //NBNTOOLS_UART_H

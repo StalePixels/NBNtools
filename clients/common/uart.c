@@ -15,19 +15,17 @@ void UART_SetVerbose(bool status) __z88dk_fastcall {
     uartVerbose = status;
 }
 
-unsigned char UART_GetUChar() {
+unsigned char UART_GetUChar(void) {
     zx_border(3);
-    unsigned long checking;
-    for(checking=0;checking<DEFAULT_TIMEOUT;checking++) {
-        if (IO_UART_STATUS & IUS_RX_AVAIL) {  // Busy wait to send a single byte.
-            zx_border(0);
-            return IO_UART_RX;
-        }
+    unsigned long checking = 0;
+    while (!(IO_UART_STATUS & IUS_RX_AVAIL)) {  // Busy wait to receive a single byte.
+        if (++checking == DEFAULT_TIMEOUT) exit((int)err_timeout_byte);
     }
-    exit((int)err_timeout_byte);
+    zx_border(0);
+    return IO_UART_RX;
 }
 
-void UART_Drain() {
+void UART_Drain(void) {
     while (IO_UART_STATUS & IUS_RX_AVAIL) IO_UART_RX;
 }
 
@@ -36,7 +34,7 @@ void UART_GetUInt16(uint8_t* val) __z88dk_fastcall {
     *(++val) = UART_GetUChar();
 }
 
-void UART_GetUInt32(uint8_t* val) {
+void UART_GetUInt32(uint8_t* val) __z88dk_fastcall {
     *val = UART_GetUChar();
     *(++val) = UART_GetUChar();
     *(++val) = UART_GetUChar();
@@ -57,7 +55,7 @@ void UART_PutCh(char c) {
     IO_UART_TX = c;
 }
 
-uint8_t UART_WaitOK(bool localecho) {
+uint8_t UART_WaitOK(bool localecho) __z88dk_fastcall {
     unsigned char cbuff[4];
 repeat:
     cbuff[0] = cbuff[1];
@@ -75,7 +73,7 @@ repeat:
     goto repeat;
 }
 
-uint8_t UART_GetStatus(bool localecho) {
+uint8_t UART_GetStatus(bool localecho) __z88dk_fastcall {
     unsigned char cbuff[4];
     repeat:
     cbuff[0] = cbuff[1];

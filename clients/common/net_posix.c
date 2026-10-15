@@ -68,7 +68,7 @@ void UART_SetVerbose(bool status) {
     uartVerbose = status;
 }
 
-unsigned char UART_GetUChar() {
+unsigned char UART_GetUChar(void) {
     int c = net_read_byte();
 
     if (c < 0) NBN_Fail(err_timeout_byte);

@@ -17,20 +17,19 @@
 
 unsigned char nbnBuff[260];
 
-unsigned char NBN_GetStatus() {
+unsigned char NBN_GetStatus(void) {
     unsigned char status[4];
     status[0] = UART_GetUChar();
     status[1] = UART_GetUChar();
     status[2] = UART_GetUChar();
     status[3] = 0;
 
-    if((status[0] == NBN_BLOCK_SUCCESS || status[0] == NBN_BLOCK_FAIL) && status[1] == '\x0D' && status[2] == '\x0A') {
-        return(status[0]);
-    } else {
+    if(!((status[0] == NBN_BLOCK_SUCCESS || status[0] == NBN_BLOCK_FAIL) && status[1] == '\x0D' && status[2] == '\x0A')) {
         printf("%s", status);
         UART_WaitOK(true);
         NBN_Fail(err_nbn_protocol);
     }
+    return(status[0]);
 }
 
 bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall {

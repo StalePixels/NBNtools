@@ -17,16 +17,16 @@ uint8_t nbnBottom8KPage = 0, nbnTop8KPage = 0;
 static unsigned char nbnBlockMemory[16384];
 unsigned char *nbnBlock = nbnBlockMemory;
 
-bool NBN_Malloc() {
+bool NBN_Malloc(void) {
     return true;
 }
 
-void NBN_Free() {
+void NBN_Free(void) {
 }
 #else
 unsigned char *nbnBlock = 0x4000;
 
-bool NBN_Malloc() {
+bool NBN_Malloc(void) {
     nbnBottom8KPage = esx_ide_bank_alloc(0);
     nbnTop8KPage = esx_ide_bank_alloc(0);
 
@@ -35,7 +35,7 @@ bool NBN_Malloc() {
     return true;
 }
 
-void NBN_Free() {
+void NBN_Free(void) {
     if(nbnBottom8KPage) esx_ide_bank_free(0, nbnBottom8KPage);
     if(nbnTop8KPage)    esx_ide_bank_free(0, nbnTop8KPage);
 }
