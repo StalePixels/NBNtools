@@ -8,6 +8,7 @@
 #define NBN_PROTOCOL_VERSION    2
 
 #define NBN_MAX_BLOCKSIZE       4096
+#define NBN_LARGE_BLOCKSIZE     16384
 #define NBN_DEFAULT_DIRPAGE     16
 
 #define NBN_BLOCK_SUCCESS               '!'
@@ -37,6 +38,18 @@
 #include <stdbool.h>
 #include "platform.h"
 
+// While the NBN pages are in, the ROM's interrupt would write its system variables at $5C00 into them
+#ifdef __ZXNEXT
+#include <intrinsic.h>
+#include <z80.h>
+extern uint8_t nbnInts;
+#define NBN_IntsOff()       nbnInts = z80_get_int_state(); intrinsic_di()
+#define NBN_IntsBack()      z80_set_int_state(nbnInts)
+#else
+#define NBN_IntsOff()
+#define NBN_IntsBack()
+#endif
+
 // App state
 typedef struct {
     unsigned char *currentPath;
@@ -57,11 +70,13 @@ extern uint8_t nbnBottom8KPage, nbnTop8KPage;
 
 extern unsigned char *nbnBlock;
 extern unsigned char nbnBuff[260];
+extern uint16_t nbnFileBlockSize;
 
 // Public Protocolly bits
 
 bool NBN_CheckVersionByte(bool fatal) __z88dk_fastcall;
 unsigned char NBN_ChangeDirectory(char *dir) __z88dk_fastcall;
+bool NBN_SetBlockSize(uint16_t size) __z88dk_fastcall;
 void NBN_ParseDirectoryHeader(nbnDirectory_t *dir) __z88dk_fastcall;
 void NBN_StatDirectory(nbnDirectory_t *dir) __z88dk_fastcall;
 void NBN_GetDirectory(nbnDirectory_t *dir) __z88dk_fastcall;

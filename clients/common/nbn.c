@@ -16,6 +16,11 @@
 #include "net.h"
 
 unsigned char nbnBuff[260];
+uint16_t nbnFileBlockSize = NBN_MAX_BLOCKSIZE;
+
+#ifdef __ZXNEXT
+uint8_t nbnInts;
+#endif
 
 unsigned char NBN_GetStatus(void) {
     unsigned char status[4];
@@ -35,6 +40,7 @@ unsigned char NBN_GetStatus(void) {
 bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall {
     uint8_t nbnComputed = 0;
 
+    NBN_IntsOff();
     NBN_PageIn();
     for(uint16_t nbnByte = 0; nbnByte < blockSize; nbnByte++) {
         nbnBlock[nbnByte] = NET_GetUChar();
@@ -43,6 +49,7 @@ bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall {
         zx_border(nbnBlock[nbnByte]%8);
     }
     NBN_PageOut();
+    NBN_IntsBack();
 
     uint8_t nbnChecksum =  NET_GetUChar();
 
@@ -108,6 +115,16 @@ unsigned char NBN_ChangeDirectory(char *dir) __z88dk_fastcall {
     return NBN_GetStatus();
 }
 
+// A server that refuses the size keeps sending NBN_MAX_BLOCKSIZE blocks
+bool NBN_SetBlockSize(uint16_t size) __z88dk_fastcall {
+    sprintf(nbnBuff, "BLOCKSIZE %u\x0A", size);
+    NET_Send(nbnBuff, strlen(nbnBuff));
+
+    if(NBN_GetStatus() != NBN_BLOCK_SUCCESS) return false;
+    nbnFileBlockSize = size;
+    return true;
+}
+
 void NBN_StatDirectory(nbnDirectory_t *dir)  __z88dk_fastcall  {
     sprintf(nbnBuff, "STAT %s\x0A\x0D", dir->currentPath);
     NET_Send(nbnBuff, strlen(nbnBuff));
@@ -131,12 +148,14 @@ void NBN_GetDirectory(nbnDirectory_t *dir)  __z88dk_fastcall  {
 bool NBN_WriteBlock(uint8_t fileHandle, uint16_t blockSize) {
     errno = 0;
 
+    NBN_IntsOff();
     NBN_PageIn();
 
     esxdos_f_write(fileHandle, nbnBlock, blockSize);
 
 
     NBN_PageOut();
+    NBN_IntsBack();
 
     if(errno) {
         return false;

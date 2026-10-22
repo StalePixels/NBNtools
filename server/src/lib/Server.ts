@@ -6,6 +6,7 @@ import { closeWith, type Answer, type Session } from './Session.js';
 
 const MAX_FILE_SIZE = 4294967295;
 const DEFAULT_BLOCK_SIZE = 4096;
+const BLOCK_SIZES = ["4096", "16384"];
 const DEFAULT_CHECKSUM = 256;
 const DEFAULT_DIR_SIZE = 16;
 const PROTOCOL_VERSION = 2;
@@ -73,6 +74,8 @@ export class Server {
             case "CD":
                 this.block = 0;
                 return this.changeDir(params.join(' '));
+            case "BLOCKSIZE":
+                return this.setBlockSize(params[0]);
             case "QUIT":
                 return closeWith("OK");
             case "!":
@@ -115,6 +118,15 @@ export class Server {
                 break;
         }
         return { bytes: new Uint8Array() };
+    }
+
+    // A refused size answers "<", as CD does, and the connection keeps the size it had
+    protected setBlockSize(size: string | undefined): Answer {
+        if (size === undefined || !BLOCK_SIZES.includes(size)) {
+            return { bytes: Uint8Array.from([60, 13, 10]) };
+        }
+        this.preferredBlockSize = Number(size);
+        return { bytes: Uint8Array.from([33, 13, 10]) };
     }
 
     protected resendBlock(): Answer {
