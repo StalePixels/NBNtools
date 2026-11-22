@@ -1,6 +1,6 @@
 import * as net from 'node:net';
 import { loadConfig, type Config } from './Config.js';
-import { log } from './Logger.js';
+import { log, logError, logWarn } from './Logger.js';
 import { Session, type ServerClass } from './Session.js';
 
 // With no config, the settings come from the NBN_ environment variables.
@@ -20,8 +20,10 @@ export const startServer = (ServerType: ServerClass, config: Config = loadConfig
   server.listen(config.PORT, config.IP, config.BACKLOG)
       // Unexpected Error handler
       .on('error', (e: NodeJS.ErrnoException) => {
-        if (e.code === 'EADDRINUSE') {
-          log(`Address in use ${config.IP}:${config.PORT} -  retrying in ${config.RETRY}ms...`);
+        // RETRY 0: no retry. The error reaches the caller's 'error' listeners,
+        //    and the server does not listen.
+        if (e.code === 'EADDRINUSE' && config.RETRY !== 0) {
+          logWarn(`Address in use ${config.IP}:${config.PORT} -  retrying in ${config.RETRY}ms...`);
           setTimeout(() => {
             server.close();
             server.listen(config.PORT, config.IP);
@@ -39,7 +41,7 @@ export const startServer = (ServerType: ServerClass, config: Config = loadConfig
         const address = socket.remoteAddress ?? '';
         const mine = perAddress.get(address) ?? 0;
         if (open >= config.MAXCONNS || mine >= config.MAXPERIP) {
-          log(`Refused ${address}: ${open} open, ${mine} from this address`);
+          logWarn(`Refused ${address}: ${open} open, ${mine} from this address`);
           socket.destroy();
           return;
         }
@@ -64,7 +66,7 @@ export const startServer = (ServerType: ServerClass, config: Config = loadConfig
       })
 
       .on('error', (err) => {
-            log(`throw ${err}`);
+            logError(`throw ${err}`);
           }
       );
 

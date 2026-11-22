@@ -11,4 +11,7 @@ try {
     }
 }
 
-startServer(PersonalServer);
+// With NBN_RETRY=0, a busy port ends the process. It must exit as a failure.
+startServer(PersonalServer).on('error', () => {
+    process.exitCode = 1;
+});

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'">
+  <title>NBN PersonalServer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <section>
+      <h2>Shared folder</h2>
+      <p class="help">The Next can read and write files in this folder, and in the folders inside it.</p>
+      <div class="row">
+        <span id="folder" class="value">No folder chosen</span>
+        <button id="choose" type="button">Choose folder</button>
+      </div>
+      <p id="folderError" class="error" hidden></p>
+    </section>
+
+    <section>
+      <h2>Server</h2>
+      <div class="row">
+        <span id="state" class="state stopped">Stopped</span>
+        <button id="toggle" type="button">Start</button>
+      </div>
+      <p id="serverError" class="error" hidden></p>
+    </section>
+
+    <section>
+      <h2>Address for the Next</h2>
+      <p class="help">On the Next, type one of these addresses as the server, and this port. The name after each address is the network connection it belongs to.</p>
+      <ul id="addresses"></ul>
+      <p class="row"><span>Port</span><span id="portShown" class="value"></span></p>
+    </section>
+
+    <section>
+      <h2>Settings</h2>
+      <p id="runningNote" class="help" hidden>Stop the server to change the port or the dot setting.</p>
+      <label class="row">Port <input id="port" type="number" min="1" max="65535" step="1"></label>
+      <p id="portError" class="error" hidden></p>
+      <label class="row"><input id="showDots" type="checkbox"> Show files and folders with names that start with "."</label>
+      <fieldset>
+        <legend>When I close this window</legend>
+        <label><input type="radio" name="closeAction" value="quit"> Quit the app. This stops the server.</label>
+        <label><input type="radio" name="closeAction" value="tray"> <span id="trayLabel">Keep the server running, with an icon in the tray</span></label>
+      </fieldset>
+      <p id="settingsError" class="error" hidden></p>
+    </section>
+
+    <section class="grow">
+      <h2>Log</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

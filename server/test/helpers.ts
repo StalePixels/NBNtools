@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { mock, type TestContext } from 'node:test';
-import { PersonalServer, Session, type Config, type ServerClass } from '../build/index.js';
+import { type TestContext } from 'node:test';
+import { logger, PersonalServer, Session, type Config, type ServerClass } from '../build/index.js';
 
 const READ_TIMEOUT_MS = 2000;
 
@@ -271,9 +271,9 @@ export async function getDir(client: Client, page?: number): Promise<{ header: D
     return { header, entries };
 }
 
-// The server logs every command with console.log
+// The server logs every command
 export function quiet(): void {
-    mock.method(console, 'log', () => undefined);
+    logger.level = 'silent';
 }
 
 export interface Setup {

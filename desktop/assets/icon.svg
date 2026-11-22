@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect x="64" y="64" width="896" height="896" rx="180" fill="#111111"/>
+  <clipPath id="box"><rect x="64" y="64" width="896" height="896" rx="180"/></clipPath>
+  <g clip-path="url(#box)">
+    <polygon points="560,960 680,960 960,680 960,560" fill="#d81e1e"/>
+    <polygon points="680,960 800,960 960,800 960,680" fill="#f0c000"/>
+    <polygon points="800,960 920,960 960,920 960,800" fill="#2ab42a"/>
+    <polygon points="920,960 1040,960 960,1040 960,920" fill="#20b8d8"/>
+  </g>
+  <text x="512" y="560" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="bold" font-size="300" fill="#ffffff" text-anchor="middle">NBN</text>
+</svg>
