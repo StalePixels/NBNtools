@@ -42,6 +42,9 @@ export async function startTestServer(root: string, options: ServerOptions = {})
     const config: Config = {
         BACKLOG: 16,
         FILEPATH: root,
+        IDLE: 600000,
+        MAXCONNS: 512,
+        MAXPERIP: 16,
         IP: '127.0.0.1',
         PORT: 0,
         RETRY: 1000,

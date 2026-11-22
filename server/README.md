@@ -33,6 +33,9 @@ NBN_PORT=48128
 | `NBN_SHOWDOTS` | `false` | `true` shows names that start with `.` in `DIR`. |
 | `NBN_BACKLOG` | `128` | How many new connections can wait while the server is busy. |
 | `NBN_RETRY` | `1000` | When the port is in use, the time in milliseconds before the server tries again. |
+| `NBN_IDLE` | `600000` | The time in milliseconds a connection can stay silent before the server closes it. |
+| `NBN_MAXCONNS` | `512` | The most connections open at once. The server closes new connections over this limit. |
+| `NBN_MAXPERIP` | `16` | The most connections open at once from one address. |
 
 A program that uses the library can give `startServer()` a `Config` of its own. With no `Config`, `startServer()` reads the environment variables.
 
