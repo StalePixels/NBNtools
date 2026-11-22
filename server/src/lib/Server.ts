@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { TextEncoder } from "node:util";
-import { log } from "./Logger.js";
+import { log, logError } from "./Logger.js";
 import { closeWith, type Answer, type Session } from './Session.js';
 
 export const MAX_FILE_SIZE = 4294967295;
@@ -382,7 +382,7 @@ export class Server {
 
         const file = this.fileHandle;
         if (file === undefined) {
-            log("No file is open");
+            logError("No file is open");
             return closeWith("ServerException_ERROR");
         }
         const { bytesRead } = await file.read(this.blockData, 0, this.blockSize, null);
@@ -390,7 +390,7 @@ export class Server {
             return { bytes: new Uint8Array() };
         }
         if (bytesRead < this.blockSize) {
-            log(`Short read: ${bytesRead} of ${this.blockSize} bytes`);
+            logError(`Short read: ${bytesRead} of ${this.blockSize} bytes`);
             return closeWith("ServerException_ERROR");
         }
         for (let i = 0; i < this.blockSize; i++) {

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { log } from './Logger.js';
+import { logError } from './Logger.js';
 
 export interface Config {
   readonly BACKLOG: number;
@@ -37,7 +37,7 @@ const checkPath = (userPath: string): string => {
   const publicPath = path.resolve(userPath);
 
   if(!fs.existsSync(publicPath)) {
-    log(`ERROR: public path (${publicPath}) does not exist`);
+    logError(`public path (${publicPath}) does not exist`);
     process.exit(-1);
   }
 

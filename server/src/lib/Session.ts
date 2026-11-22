@@ -1,7 +1,7 @@
 import type * as net from 'node:net';
 import { TextDecoder, TextEncoder } from 'node:util';
 import type { Config } from './Config.js';
-import { log } from './Logger.js';
+import { log, logError, logWarn } from './Logger.js';
 import type { Server } from './Server.js';
 
 const MAX_LINE_LENGTH = 256;
@@ -74,7 +74,7 @@ export class Session {
     });
 
     socket.on("error", (err) => {
-      log(`Session error from ${socket.remoteAddress}:${socket.remotePort}: ${err.message}`);
+      logWarn(`Session error from ${socket.remoteAddress}:${socket.remotePort}: ${err.message}`);
       socket.destroy();
     });
 
@@ -147,7 +147,7 @@ export class Session {
       try {
         answer = await this.line(this.lines.shift()!);
       } catch (err) {
-        log(err);
+        logError(err);
         answer = closeWith("ServerException_ERROR");
       }
       if (!this.open()) {

@@ -32,12 +32,16 @@ NBN_PORT=48128
 | `NBN_PORT` | `48128` | The TCP port to listen on. |
 | `NBN_SHOWDOTS` | `false` | `true` shows names that start with `.` in `DIR`. |
 | `NBN_BACKLOG` | `128` | How many new connections can wait while the server is busy. |
-| `NBN_RETRY` | `1000` | When the port is in use, the time in milliseconds before the server tries again. |
+| `NBN_RETRY` | `1000` | When the port is in use, the time in milliseconds before the server tries again. With `0` it does not try again: the server that `startServer()` returns emits `'error'` with the code `EADDRINUSE`, and does not listen. |
 | `NBN_IDLE` | `600000` | The time in milliseconds a connection can stay silent before the server closes it. |
 | `NBN_MAXCONNS` | `512` | The most connections open at once. The server closes new connections over this limit. |
 | `NBN_MAXPERIP` | `16` | The most connections open at once from one address. |
 
 A program that uses the library can give `startServer()` a `Config` of its own. With no `Config`, `startServer()` reads the environment variables.
+
+The server logs with [pino](https://getpino.io). It writes one JSON object per line to standard output, with `time` in milliseconds since 1970, `level` (30 is info, 40 warn, 50 error) and the message in `msg`. To read the log as text, pipe it through pino-pretty: `npm start | npx pino-pretty`.
+
+A program that uses the library logs with `log()` at info, `logWarn()` and `logError()`. They take the same arguments as `console.log`. `logger` is the pino logger itself, for example to change `logger.level`. `addLogListener(listener)` gives the listener each JSON line, without the newline, and returns a function that removes the listener.
 
 ## Tests
 `npm test` builds the server and runs the tests in `test/`. Each test starts its own server on a free port of `127.0.0.1`, with a new public folder in the system temp folder.
