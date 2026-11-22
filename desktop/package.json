@@ -1,0 +1,97 @@
+{
+  "name": "nbn-personalserver",
+  "productName": "NBN PersonalServer",
+  "version": "2.0.0",
+  "description": "Desktop app for the NBN PersonalServer",
+  "private": true,
+  "type": "module",
+  "main": "build/main.cjs",
+  "desktopName": "nbn-personalserver.desktop",
+  "repository": "https://github.com/StalePixels/NBNtools",
+  "license": "MIT",
+  "author": "StalePixels",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "server": "npm --prefix ../server run build",
+    "bundle": "node bundle.mjs",
+    "build": "npm run server && npm run bundle",
+    "typecheck": "npm run server && tsc -p tsconfig.json",
+    "test": "npm run server && node --test 'test/*.test.ts'",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist": "npm run build && electron-builder --mac --win --linux"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "nbn-server": "file:../server",
+    "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "com.stalepixels.nbn-personalserver",
+    "productName": "NBN PersonalServer",
+    "artifactName": "NBN-PersonalServer-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "!build/**/*.map",
+      "assets/*.png",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "assets/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "notarize": false
+    },
+    "dmg": {
+      "writeUpdateInfo": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "differentialPackage": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Network",
+      "syncDesktopName": true
+    },
+    "publish": null
+  }
+}
