@@ -24,6 +24,24 @@ function concatTypedArrays(a: Uint8Array, b: ArrayLike<number>): Uint8Array { //
   return c;
 }
 
+// A run of raw bytes asked for with Session.receive(), and the handler for it.
+interface RawInput {
+  bytes: Uint8Array;
+  handler: (bytes: Uint8Array) => Promise<Answer>;
+}
+
+// Any control character but TAB. Bytes over 127 are allowed, for names that
+//    are not ASCII.
+function hasControlCharacters(line: string): boolean {
+  for (let i = 0; i < line.length; i++) {
+    const code = line.charCodeAt(i);
+    if ((code < 32 && code !== 9) || code === 127) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function closeWith(message: string): Answer {
   return { bytes: concatTypedArrays(new TextEncoder().encode(message), [13, 10]), close: true };
 }
@@ -35,8 +53,10 @@ export class Session {
 
   private server?: Server;
   private input: Buffer = Buffer.alloc(0);
-  private lines: string[] = [];
+  private lines: (string | RawInput)[] = [];
   private busy = false;
+  private rawWanted = 0;
+  private rawHandler?: (bytes: Uint8Array) => Promise<Answer>;
 
   constructor(socket: net.Socket, config: Config, ServerType: ServerClass) {
     this.config = config;
@@ -63,10 +83,33 @@ export class Session {
     });
   }
 
-  // A TCP read can hold several lines or part of one. nbnshell ends its
-  //    commands LF then CR, so the CR arrives at the start of the next line.
+  // In raw mode, the next `count` bytes from the client go to `handler` as
+  //    they are, not as a line. Call it from a handler; the session writes that
+  //    handler's answer first. After the bytes, the session reads lines again.
+  public receive(count: number, handler: (bytes: Uint8Array) => Promise<Answer>): void {
+    this.rawWanted = count;
+    this.rawHandler = handler;
+    this.split();
+  }
+
   public data(buffer: Buffer): void {
     this.input = Buffer.concat([this.input, buffer]);
+    this.split();
+    void this.drain();
+  }
+
+  // A TCP read can hold several lines or part of one. nbnshell ends its
+  //    commands LF then CR, so the CR arrives at the start of the next line.
+  private split(): void {
+    if (this.rawWanted > 0) {
+      if (this.input.length < this.rawWanted || !this.open()) {
+        return;
+      }
+      this.lines.push({ bytes: Uint8Array.from(this.input.subarray(0, this.rawWanted)), handler: this.rawHandler! });
+      this.input = this.input.subarray(this.rawWanted);
+      this.rawWanted = 0;
+      this.rawHandler = undefined;
+    }
 
     let end = this.input.indexOf(10);
     while (end !== -1 && this.open()) {
@@ -89,10 +132,7 @@ export class Session {
 
     if (this.input.length > MAX_LINE_LENGTH && this.open()) {
       this.end(closeWith("BadCommand_ERROR"));
-      return;
     }
-
-    void this.drain();
   }
 
   // Lines are handled one at a time, and each answer is written before the
@@ -130,9 +170,16 @@ export class Session {
     return !this.socket.writableEnded && !this.socket.destroyed;
   }
 
-  private async line(line: string): Promise<Answer> {
+  private async line(line: string | RawInput): Promise<Answer> {
+    if (typeof line !== "string") {
+      return await line.handler(line.bytes);
+    }
     switch(this.state) {
       case "W": {   // WAITING for command
+        // Control characters mean binary data, such as a TLS handshake
+        if (hasControlCharacters(line)) {
+          return closeWith("BadCommand_ERROR");
+        }
         // Parse the commands
         const cmds = line.split(" ");                          // Break at space
         const cmd = cmds[0].toUpperCase();                      // Uppercase
