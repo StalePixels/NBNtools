@@ -4,12 +4,13 @@ import { TextEncoder } from "node:util";
 import { log } from "./Logger.js";
 import { closeWith, type Answer, type Session } from './Session.js';
 
-const MAX_FILE_SIZE = 4294967295;
+export const MAX_FILE_SIZE = 4294967295;
 const DEFAULT_BLOCK_SIZE = 4096;
 const BLOCK_SIZES = ["4096", "16384"];
 const DEFAULT_CHECKSUM = 256;
 const DEFAULT_DIR_SIZE = 16;
 const PROTOCOL_VERSION = 2;
+const MAX_BAD_COMMANDS = 3;
 
 const NBN_COMMAND_ACK = "!".charCodeAt(0);
 const NBN_COMMAND_BACK = "<".charCodeAt(0);
@@ -21,7 +22,7 @@ function concatTypedArrays(a: Uint8Array, b: ArrayLike<number>): Uint8Array { //
     return c;
 }
 
-function isInsideRoot(root: string, absPath: string): boolean {
+export function isInsideRoot(root: string, absPath: string): boolean {
     const base = path.resolve(root);
     const resolved = path.resolve(absPath);
     return resolved === base || resolved.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
@@ -51,6 +52,7 @@ export class Server {
     protected session: Session;
     protected state: string;
     protected totalBlocks!: number;
+    private badCommands = 0;
 
     constructor(session: Session) {
         this.session = session;
@@ -86,8 +88,18 @@ export class Server {
                 }
                 return { bytes: new Uint8Array() };
             default:
-                return closeWith("BadCommand_ERROR");
+                return this.badCommand();
         }
+    }
+
+    // An unknown or malformed command. The session stays open for a typo, and
+    //    closes on the third one, which is how bots behave.
+    protected badCommand(): Answer {
+        this.badCommands++;
+        if (this.badCommands >= MAX_BAD_COMMANDS) {
+            return closeWith("BadCommand_ERROR");
+        }
+        return { bytes: new TextEncoder().encode("BadCommand_ERROR\r\n") };
     }
 
     // Old clients send "!1" as well as "!" for each block. Only the first "!1",

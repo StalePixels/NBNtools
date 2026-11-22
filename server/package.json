@@ -21,7 +21,8 @@
     "prepare": "npm run build",
     "start": "node build/main.js",
     "lint": "oxlint --type-aware --deny-warnings",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "npm run build && tsc -p test/tsconfig.json",
+    "test": "npm run build && node --test 'test/*.test.ts'"
   },
   "engines": {
     "node": ">=24"

@@ -1,10 +1,10 @@
 import * as net from 'node:net';
-import { loadConfig } from './Config.js';
+import { loadConfig, type Config } from './Config.js';
 import { log } from './Logger.js';
 import { Session, type ServerClass } from './Session.js';
 
-export const startServer = (ServerType: ServerClass): net.Server => {
-  const config = loadConfig();
+// With no config, the settings come from the NBN_ environment variables.
+export const startServer = (ServerType: ServerClass, config: Config = loadConfig()): net.Server => {
   const perAddress = new Map<string, number>();
   let open = 0;
 

@@ -1,5 +1,4 @@
 node_modules
-test
 .idea
 coverage
 .nyc_output
@@ -8,3 +7,4 @@ config.json
 yarn.lock
 public/*
 build/*
+.env
