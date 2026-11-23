@@ -15,11 +15,19 @@ void UART_SetVerbose(bool status) __z88dk_fastcall {
     uartVerbose = status;
 }
 
+// The timeout is counted in frames, as wait_frames counts them, so it is the same time at any CPU speed
 unsigned char UART_GetUChar(void) {
+    uint16_t frames = UART_TIMEOUT_FRAMES;
+    bool late = false;
+
     zx_border(3);
-    unsigned long checking = 0;
-    while (!(IO_UART_STATUS & IUS_RX_AVAIL)) {  // Busy wait to receive a single byte.
-        if (++checking == DEFAULT_TIMEOUT) exit((int)err_timeout_byte);
+    while (!(IO_UART_STATUS & IUS_RX_AVAIL)) {
+        if(ZXN_READ_REG(REG_ACTIVE_VIDEO_LINE_H) & 1) {
+            late = true;
+        } else if(late) {
+            late = false;
+            if(!--frames) exit((int)err_timeout_byte);
+        }
     }
     zx_border(0);
     return IO_UART_RX;

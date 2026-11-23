@@ -15,7 +15,8 @@ __sfr __banked __at 0x153b IO_153B;
 __sfr __banked __at 0x153b IO_UART_CONTROL;
 #endif
 
-#define DEFAULT_TIMEOUT         131071UL
+// 10 s at 50 Hz, 8.3 s at 60 Hz
+#define UART_TIMEOUT_FRAMES     500
 
 unsigned char UART_GetUChar(void);
 void UART_Drain(void);
