@@ -15,6 +15,15 @@
 #include "messages.h"
 #include "net.h"
 
+// A client with its own line open on screen, such as a progress count, builds with
+// -DNBN_PRINT_HOOK=name, and void name(void) ends that line before each message printed here
+#ifdef NBN_PRINT_HOOK
+void NBN_PRINT_HOOK(void);
+#define NBN_PrintBegin()        NBN_PRINT_HOOK()
+#else
+#define NBN_PrintBegin()
+#endif
+
 unsigned char nbnBuff[260];
 uint16_t nbnFileBlockSize = NBN_MAX_BLOCKSIZE;
 
@@ -30,6 +39,7 @@ unsigned char NBN_GetStatus(void) {
     status[3] = 0;
 
     if(!((status[0] == NBN_BLOCK_SUCCESS || status[0] == NBN_BLOCK_FAIL) && status[1] == '\x0D' && status[2] == '\x0A')) {
+        NBN_PrintBegin();
         printf("%s", status);
         UART_WaitOK(true);
         NBN_Fail(err_nbn_protocol);
@@ -57,6 +67,7 @@ bool NBN_GetBlock(uint16_t blockSize) __z88dk_fastcall {
     if(nbnChecksum == nbnComputed) {
         return true;
     }
+    NBN_PrintBegin();
     printf("Checksum %d/%d\n\n", nbnComputed, nbnChecksum);
     return false;
 }
@@ -70,6 +81,7 @@ bool NBN_CheckVersionByte(bool fatal) __z88dk_fastcall {
             //  so if we get back a bit7(64+) char, we know it's not a protocol header...
             //
             // Now generate an error, the first character of which is already in errno...
+            NBN_PrintBegin();
             printf("\n Server Said: %c", errno);
             NET_WaitOK(true);
             if(fatal) {
